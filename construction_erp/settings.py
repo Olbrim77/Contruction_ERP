@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'projects.apps.ProjectsConfig',
+    'django.contrib.humanize',
 ]
 
 MIDDLEWARE = [
@@ -120,3 +122,13 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Ez mondja meg a Djangónak, hogy használja az ezres tagolást
+USE_THOUSAND_SEPARATOR = True
+
+# Biztosítjuk, hogy a magyar nyelvi beállításokat használja
+# (ami alapból a szóközt használja elválasztónak)
+LANGUAGE_CODE = 'hu'

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Törlési Kérelem Megerősítése</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
+        .container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            max-width: 600px;
+        }
+        h1 { color: #d9534f; }
+        .button-delete {
+            background-color: #d9534f;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            text-decoration: none;
+        }
+        .button-cancel {
+            display: inline-block;
+            margin-top: 15px;
+            color: #555;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Törlési Kérelem Megerősítése</h1>
+        <p>
+            Biztosan törlésre szeretnéd jelölni a következő projektet?
+        </p>
+
+        <h3>"{{ project.name }}"</h3>
+
+        <p>
+            A projekt nem törlődik azonnal. "Törlés Kérelmezve" státuszba kerül,
+            és egy adminisztrátor fogja felülvizsgálni a kérelmet.
+        </p>
+
+        <form method="POST">
+            {% csrf_token %}
+            <button type="submit" class="button-delete">Igen, törlés kérelmezése</button>
+        </form>
+
+        <a href="{% url 'project-detail' project.id %}" class="button-cancel">Mégse</a>
+    </div>
+
+</body>
+</html>

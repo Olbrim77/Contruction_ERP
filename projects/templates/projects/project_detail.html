@@ -1,0 +1,294 @@
+{% load humanize %}
+
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ project.name }} - Részletek</title>
+
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
+        h1, h2 { color: #333; border-bottom: 2px solid #005a9c; padding-bottom: 5px; }
+        .details {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .meta { font-size: 1.1em; line-height: 1.6; }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+            color: #005a9c;
+            font-weight: bold;
+        }
+        .deletion-warning {
+            background-color: #fcf8e3;
+            border: 1px solid #fae29f;
+            color: #8a6d3b;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .button-container { margin-bottom: 15px; }
+        .button {
+            display: inline-block;
+            color: white;
+            padding: 8px 12px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-left: 10px;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-edit { background-color: #f0ad4e; }
+        .btn-delete { background-color: #d9534f; }
+        .btn-import { background-color: #5cb85c; margin-left: 0; }
+        .btn-print { background-color: #31708f; margin-left: 0; }
+
+        .excel-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .excel-table th, .excel-table td {
+            border: 1px solid #ddd;
+            padding: 8px 10px;
+            text-align: left;
+            /* Tördelés engedélyezése a hosszú szavaknál */
+            word-break: break-word;
+        }
+        .excel-table thead th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            color: #333;
+        }
+        .excel-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .excel-table td.numeric {
+            text-align: right;
+            font-family: monospace;
+            /* Megakadályozza, hogy a számok megtörjenek */
+            white-space: nowrap;
+        }
+        .excel-table td.editable a {
+            display: block;
+            text-decoration: none;
+            color: #005a9c;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .excel-table td.editable a:hover {
+            background-color: #f0f8ff;
+        }
+        /* Szerkesztés gomb cella */
+        .excel-table td.actions {
+            text-align: center;
+            white-space: nowrap;
+        }
+        .excel-table td.actions a {
+            text-decoration: none;
+            padding: 4px;
+        }
+
+        .summary-box {
+            background-color: #fff;
+            border: 2px solid #005a9c;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary-box h2 {
+            margin-top: 0;
+            border-bottom: none;
+            color: #005a9c;
+        }
+        .summary-box p {
+            font-size: 1.1em;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .summary-box p span {
+            font-weight: bold;
+            float: right;
+            color: #333;
+            font-family: monospace;
+        }
+        .summary-box hr {
+            border: 0;
+            border-top: 1px solid #ddd;
+            margin: 15px 0;
+        }
+        .summary-box p.total {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+        .summary-box p.total span {
+            color: #005a9c;
+            font-size: 1.1em;
+        }
+
+        @media print {
+            body { margin: 0; background-color: #fff; }
+            .no-print, .back-link { display: none !important; }
+            .details, .summary-box, .excel-table { box-shadow: none; border: 1px solid #ccc; }
+            h1, h2 { border: none; }
+            .excel-table { page-break-inside: auto; }
+            .excel-table tr { page-break-inside: avoid; page-break-after: auto; }
+            /* Nyomtatásban a szerkesztő linkeket eltüntetjük */
+            .excel-table td.editable a { color: black; text-decoration: none; font-weight: normal; }
+            .excel-table td.actions { display: none; }
+            .excel-table th.actions { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>{{ project.name }}</h1>
+
+    <div class="button-container no-print">
+        {% if project.status == 'TORLES_KERELEM' %}
+            <div class="deletion-warning">
+                Ez a projekt törlésre lett jelölve. Adminisztrátori jóváhagyásra vár.
+            </div>
+        {% else %}
+            <button onclick="window.print()" class="button btn-print">
+                🖨️ Nyomtatás / PDF
+            </button>
+            <a href="{% url 'import-tasks' project.id %}" class="button btn-import">
+                📥 Tételsor Importálás (Excel)
+            </a>
+            <a href="{% url 'project-update' project.id %}" class="button btn-edit">
+                ✎ Projekt Szerkesztése
+            </a>
+            <a href="{% url 'project-request-delete' project.id %}" class="button btn-delete">
+                🗑️ Törlés Kérelmezése
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="details">
+        <p class="meta">
+            <strong>Helyszín:</strong> {{ project.location }} <br>
+            <strong>Ügyfél:</strong> {{ project.client|default:"Nincs megadva" }} <br>
+            <strong>Státusz:</strong> {{ project.get_status_display }} <br>
+            <strong>Tervezett időtartam:</strong>
+                {% if project.start_date %}
+                    {{ project.start_date|date:"Y-m-d" }} -
+                    {{ calculated_end_date|date:"Y-m-d"|default:"N/A" }}
+                    ({{ total_workdays }} munkanap)
+                {% else %}
+                    Nincs kezdési dátum megadva
+                {% endif %}
+            <br>
+            <strong>Rezsíóabér:</strong> {{ project.hourly_rate|floatformat:0|intcomma }} Ft/óra <br>
+            <strong>Tervezett munkaóra / nap:</strong> {{ project.hours_per_day|floatformat:2 }} óra <br>
+            <strong>Alkalmazott ÁFA kulcs:</strong> {{ project.vat_rate }}%
+        </p>
+    </div>
+
+    <div class="summary-box">
+        <h2>Pénzügyi Összegzés</h2>
+        <p>
+            Teljes Anyagköltség (Nettó):
+            <span>{{ total_anyag|floatformat:0|intcomma }} HUF</span>
+        </p>
+        <p>
+            Teljes Munkadíj (Nettó):
+            <span>{{ total_dij|floatformat:0|intcomma }} HUF</span>
+        </C>
+        <p class="total">
+            Projekt Végösszeg (Nettó):
+            <span>{{ total_project_netto|floatformat:0|intcomma }} HUF</span>
+        </p>
+        <hr>
+        <p>
+            ÁFA ({{ vat_rate }}%):
+            <span>{{ total_vat|floatformat:0|intcomma }} HUF</span>
+        </p>
+        <p class="total">
+            Projekt Végösszeg (Bruttó):
+            <span>{{ total_project_brutto|floatformat:0|intcomma }} HUF</span>
+        </p>
+        <hr>
+        <p>
+            Tervezett időráfordítás:
+            <span>{{ total_effort_hours|floatformat:2 }} óra</span>
+        </p>
+    </div>
+
+    <h2>Költségvetési Tételsorok</h2>
+
+    <div style="overflow-x: auto;">
+        <table class="excel-table">
+            <thead>
+                <tr>
+                    <th>Sorszám</th> <th>Tételszám (B)</th>
+                    <th>Leírás (C)</th>
+                    <th>Mennyiség (D)</th>
+                    <th>Egység (E)</th>
+                    <th>Anyag Össz. (H)</th>
+                    <th>Díj Össz. (I)</th>
+
+                    <th>Normaidő (N)</th>
+                    <th>Megjegyzés (J)</th>
+                    <th>Munkanem (M)</th>
+                    <th>Alvállalkozó (O)</th>
+
+                    <th class="actions no-print">Műveletek</th> </tr>
+            </thead>
+            <tbody>
+                {% for tetel in tasks %}
+                <tr>
+                    <td>{{ tetel.sorszam }}</td> <td>{{ tetel.tetelszam }}</td>
+                    <td>{{ tetel.leiras }}</td>
+
+                    <td class="numeric editable">
+                        <a href="{% url 'tetelsor-edit-quantity' tetel.id %}">
+                            {{ tetel.mennyiseg }}
+                        </a>
+                    </td>
+
+                    <td>{{ tetel.egyseg }}</td>
+                    <td class="numeric">{{ tetel.anyag_osszesen|floatformat:0|intcomma }} HUF</td>
+                    <td class="numeric">{{ tetel.dij_osszesen|floatformat:0|intcomma }} HUF</td>
+
+                    <td class="numeric">{{ tetel.normaido|floatformat:2 }} óra</td>
+                    <td>{{ tetel.megjegyzes|default:"-" }}</td>
+                    <td>{{ tetel.munkanem|default:"-" }}</td>
+                    <td>{{ tetel.alvallalkozo|default:"-" }}</td>
+
+                    <td class="actions no-print">
+                        <a href="{% url 'tetelsor-edit' tetel.id %}" title="Részletes szerkesztés">✏️</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" style="text-align: center;">
+                        Nincsenek tételsorok rögzítve ehhez a projekthez.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <hr>
+
+    <a href="{% url 'project-list' %}" class="back-link no-print">&laquo; Vissza a projekt listára</a>
+
+</body>
+</html>

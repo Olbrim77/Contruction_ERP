@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Építőipari Projektek</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
+        h1 { color: #333; }
+        .project-card {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .project-card h2 { margin-top: 0; }
+        /* Stílus a linkelt címnek */
+        .project-card h2 a {
+            color: #005a9c;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .project-card h2 a:hover {
+            text-decoration: underline;
+        }
+
+        .meta { font-size: 0.9em; color: #555; }
+        .status {
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background-color: #eee;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Folyamatban lévő projektek</h1>
+
+    <a href="{% url 'project-create' %}" style="
+        background-color: #005a9c;
+        color: white;
+        padding: 10px 15px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+    ">
+        + Új Projekt Hozzáadása
+    </a>
+
+    <hr>
+
+    {% for p in projects_key %}
+        <div class="project-card">
+
+            <h2><a href="{% url 'project-detail' p.id %}">{{ p.name }}</a></h2>
+
+            <p class="meta">
+                <strong>Helyszín:</strong> {{ p.location }} <br>
+                <strong>Ügyfél:</strong> {{ p.client }} <br>
+                <strong>Státusz:</strong>
+                <span class="status">{{ p.get_status_display }}</span>
+            </p>
+
+        </div>
+    {% empty %}
+        <p>Jelenleg nincsenek rögzített projektek.</p>
+    {% endfor %}
+
+</body>
+</html>
