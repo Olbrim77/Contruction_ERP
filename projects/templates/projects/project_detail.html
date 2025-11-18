@@ -21,7 +21,7 @@
 
         .back-link {
             display: inline-block;
-            margin-top: 20px;
+            margin-bottom: 15px;
             text-decoration: none;
             color: #005a9c;
             font-weight: bold;
@@ -67,7 +67,6 @@
             border: 1px solid #ddd;
             padding: 8px 10px;
             text-align: left;
-            /* Tördelés engedélyezése a hosszú szavaknál */
             word-break: break-word;
         }
         .excel-table thead th {
@@ -81,7 +80,6 @@
         .excel-table td.numeric {
             text-align: right;
             font-family: monospace;
-            /* Megakadályozza, hogy a számok megtörjenek */
             white-space: nowrap;
         }
         .excel-table td.editable a {
@@ -94,7 +92,6 @@
         .excel-table td.editable a:hover {
             background-color: #f0f8ff;
         }
-        /* Szerkesztés gomb cella */
         .excel-table td.actions {
             text-align: center;
             white-space: nowrap;
@@ -149,7 +146,6 @@
             h1, h2 { border: none; }
             .excel-table { page-break-inside: auto; }
             .excel-table tr { page-break-inside: avoid; page-break-after: auto; }
-            /* Nyomtatásban a szerkesztő linkeket eltüntetjük */
             .excel-table td.editable a { color: black; text-decoration: none; font-weight: normal; }
             .excel-table td.actions { display: none; }
             .excel-table th.actions { display: none; }
@@ -157,6 +153,8 @@
     </style>
 </head>
 <body>
+
+    <a href="{% url 'project-list' %}" class="back-link no-print">&laquo; Vissza a projekt listára</a>
 
     <h1>{{ project.name }}</h1>
 
@@ -237,48 +235,40 @@
         <table class="excel-table">
             <thead>
                 <tr>
-                    <th>Sorszám</th> <th>Tételszám (B)</th>
+                    <th>Sorszám</th>
+                    <th>Tételszám (B)</th>
                     <th>Leírás (C)</th>
                     <th>Mennyiség (D)</th>
                     <th>Egység (E)</th>
                     <th>Anyag Össz. (H)</th>
                     <th>Díj Össz. (I)</th>
 
-                    <th>Normaidő (N)</th>
-                    <th>Megjegyzés (J)</th>
-                    <th>Munkanem (M)</th>
-                    <th>Alvállalkozó (O)</th>
-
-                    <th class="actions no-print">Műveletek</th> </tr>
+                    <th class="actions no-print">Műveletek</th>
+                </tr>
             </thead>
             <tbody>
                 {% for tetel in tasks %}
                 <tr>
-                    <td>{{ tetel.sorszam }}</td> <td>{{ tetel.tetelszam }}</td>
+                    <td>{{ tetel.sorszam }}</td>
+                    <td>{{ tetel.tetelszam }}</td>
                     <td>{{ tetel.leiras }}</td>
-
                     <td class="numeric editable">
                         <a href="{% url 'tetelsor-edit-quantity' tetel.id %}">
                             {{ tetel.mennyiseg }}
                         </a>
                     </td>
-
                     <td>{{ tetel.egyseg }}</td>
                     <td class="numeric">{{ tetel.anyag_osszesen|floatformat:0|intcomma }} HUF</td>
                     <td class="numeric">{{ tetel.dij_osszesen|floatformat:0|intcomma }} HUF</td>
 
-                    <td class="numeric">{{ tetel.normaido|floatformat:2 }} óra</td>
-                    <td>{{ tetel.megjegyzes|default:"-" }}</td>
-                    <td>{{ tetel.munkanem|default:"-" }}</td>
-                    <td>{{ tetel.alvallalkozo|default:"-" }}</td>
-
                     <td class="actions no-print">
                         <a href="{% url 'tetelsor-edit' tetel.id %}" title="Részletes szerkesztés">✏️</a>
+                        <a href="{% url 'tetelsor-delete' tetel.id %}" title="Tételsor Törlése" style="color: red; margin-left: 10px;">🗑️</a>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="12" style="text-align: center;">
+                    <td colspan="8" style="text-align: center;">
                         Nincsenek tételsorok rögzítve ehhez a projekthez.
                     </td>
                 </tr>
@@ -286,9 +276,8 @@
             </tbody>
         </table>
     </div>
-    <hr>
 
-    <a href="{% url 'project-list' %}" class="back-link no-print">&laquo; Vissza a projekt listára</a>
+    <hr class="no-print">
 
 </body>
 </html>

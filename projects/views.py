@@ -2,7 +2,6 @@
 
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Project, Task, Tetelsor, Munkanem, Alvallalkozo
-# === BŐVÍTETT IMPORT AZ ÚJ ŰRLAPOKKAL ===
 from .forms import ProjectForm, TetelsorQuantityForm, TetelsorEditForm
 
 import openpyxl
@@ -125,101 +124,68 @@ def project_request_deletion(request, pk):
     return render(request, 'projects/project_confirm_delete.html', context)
 
 
-# === IMPORT NÉZET (MÓDOSÍTVA: Kérés 1 & 2) ===
+# --- IMPORT NÉZET (VÁLTOZATLAN) ---
 def import_tasks(request, project_id):
     project = get_object_or_404(Project, id=project_id)
 
-    # === BIZTONSÁGOS CELLA OLVASÓ FUNKCIÓ ===
     def get_cell_value(row, index, default=""):
-        # Ez a funkció biztonságosan olvassa a cellát
-        # Még akkor is, ha a sor rövidebb, mint az 'index'
         try:
             val = row[index].value
             return str(val) if val is not None else default
         except (IndexError, AttributeError):
-            # Ha a sor "csonka" (túl rövid) vagy a cella nem létezik,
-            # üres stringet adunk vissza. (Kérés 1)
             return default
 
     def get_cell_decimal(row, index):
-        # Ugyanaz, de számokhoz (Decimal)
         try:
             val = row[index].value
             return Decimal(val) if val is not None else Decimal(0)
         except (IndexError, AttributeError, TypeError, ValueError):
             return Decimal(0)
 
-    # ========================================
-
     if request.method == 'POST' and 'temp_file_path' in request.POST:
         temp_file_path = request.POST.get('temp_file_path')
         selected_sheets = request.POST.getlist('sheets')
         full_path = os.path.join(settings.MEDIA_ROOT, temp_file_path)
-
-        row_counter = 1  # === Automatikus sorszámozás indítása (Kérés 2) ===
-
+        row_counter = 1
         try:
             workbook = openpyxl.load_workbook(full_path, data_only=True)
             for sheet_name in selected_sheets:
                 if sheet_name not in workbook.sheetnames:
                     continue
                 ws = workbook[sheet_name]
-
                 for row in ws.iter_rows(min_row=2):
                     if not row or len(row) < 2:
                         continue
-
-                    tetelszam = get_cell_value(row, 1)  # "B" oszlop
+                    tetelszam = get_cell_value(row, 1)
                     if not tetelszam:
                         continue
 
-                    # === ADATOK KINYERÉSE (Már a biztonságos funkcióval) ===
-                    # "A" oszlopot (row[0]) már nem olvassuk!
-                    leiras = get_cell_value(row, 2)  # C
-                    mennyiseg = get_cell_decimal(row, 3)  # D
-                    egyseg = get_cell_value(row, 4)  # E
-                    anyag_egysegar = get_cell_decimal(row, 5)  # F
-                    megjegyzes = get_cell_value(row, 9)  # J
-                    engy_kod = get_cell_value(row, 10)  # K
-                    k_jelzo = get_cell_value(row, 11)  # L
-                    normaido = get_cell_decimal(row, 13)  # N
-                    cpr_kod = get_cell_value(row, 15)  # P
+                    leiras = get_cell_value(row, 2)
+                    mennyiseg = get_cell_decimal(row, 3)
+                    egyseg = get_cell_value(row, 4)
+                    anyag_egysegar = get_cell_decimal(row, 5)
+                    megjegyzes = get_cell_value(row, 9)
+                    engy_kod = get_cell_value(row, 10)
+                    k_jelzo = get_cell_value(row, 11)
+                    normaido = get_cell_decimal(row, 13)
+                    cpr_kod = get_cell_value(row, 15)
+                    munkanem_obj, _ = Munkanem.objects.get_or_create(
+                        nev=get_cell_value(row, 12).strip()) if get_cell_value(row, 12) else (None, False)
+                    alvallalkozo_obj, _ = Alvallalkozo.objects.get_or_create(
+                        nev=get_cell_value(row, 14).strip()) if get_cell_value(row, 14) else (None, False)
 
-                    # === KAPCSOLÓDÓ OBJEKTUMOK (M & O) ===
-                    munkanem_obj = None
-                    munkanem_nev = get_cell_value(row, 12)  # M
-                    if munkanem_nev:
-                        munkanem_obj, _ = Munkanem.objects.get_or_create(nev=munkanem_nev.strip())
-
-                    alvallalkozo_obj = None
-                    alvallalkozo_nev = get_cell_value(row, 14)  # O
-                    if alvallalkozo_nev:
-                        alvallalkozo_obj, _ = Alvallalkozo.objects.get_or_create(nev=alvallalkozo_nev.strip())
-
-                    # === ADATBÁZIS MŰVELET ===
                     defaults_data = {
-                        'sorszam': str(row_counter),  # === Automatikus sorszám (Kérés 2) ===
-                        'leiras': leiras,
-                        'mennyiseg': mennyiseg,
-                        'egyseg': egyseg,
-                        'anyag_egysegar': anyag_egysegar,
-                        'megjegyzes': megjegyzes,
-                        'engy_kod': engy_kod,
-                        'k_jelzo': k_jelzo,
-                        'normaido': normaido,
-                        'cpr_kod': cpr_kod,
-                        'munkanem': munkanem_obj,
+                        'sorszam': str(row_counter),
+                        'leiras': leiras, 'mennyiseg': mennyiseg, 'egyseg': egyseg,
+                        'anyag_egysegar': anyag_egysegar, 'megjegyzes': megjegyzes,
+                        'engy_kod': engy_kod, 'k_jelzo': k_jelzo, 'normaido': normaido,
+                        'cpr_kod': cpr_kod, 'munkanem': munkanem_obj,
                         'alvallalkozo': alvallalkozo_obj,
                     }
-
                     tetelsor_obj, created = Tetelsor.objects.update_or_create(
-                        project=project,
-                        tetelszam=tetelszam,
-                        defaults=defaults_data
+                        project=project, tetelszam=tetelszam, defaults=defaults_data
                     )
-
-                    row_counter += 1  # === Sorszám növelése (Kérés 2) ===
-
+                    row_counter += 1
             workbook.close()
         except Exception as e:
             print(f"Hiba a feldolgozás során: {e}")
@@ -228,7 +194,6 @@ def import_tasks(request, project_id):
                 default_storage.delete(temp_file_path)
         return redirect('project-detail', pk=project.id)
 
-    # --- 1. LÉPCSŐ (Feltöltés - VÁLTOZATLAN) ---
     if request.method == 'POST' and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
         if not excel_file.name.endswith('.xlsx'):
@@ -264,32 +229,40 @@ def tetelsor_update_quantity(request, pk):
             return redirect('project-detail', pk=tetelsor.project.id)
     else:
         form = TetelsorQuantityForm(instance=tetelsor)
-    context = {
-        'form': form,
-        'tetelsor': tetelsor
-    }
+    context = {'form': form, 'tetelsor': tetelsor}
     return render(request, 'projects/tetelsor_form.html', context)
 
 
-# === EZ A TELJESEN ÚJ NÉZET A RÉSZLETES SZERKESZTÉSHEZ (Kérés 3) ===
+# --- Részletes Szerkesztő Nézet (VÁLTOZATLAN) ---
 def tetelsor_update(request, pk):
-    """
-    Nézet egy tételsor részletes módosításához (J-P oszlopok, stb.)
-    'pk' a TETELSOR azonosítója.
-    """
     tetelsor = get_object_or_404(Tetelsor, id=pk)
-
     if request.method == 'POST':
         form = TetelsorEditForm(request.POST, instance=tetelsor)
         if form.is_valid():
-            form.save()  # A 'save()' metódus (models.py) automatikusan újraszámol!
+            form.save()
             return redirect('project-detail', pk=tetelsor.project.id)
     else:
-        # GET kérés: Mutassuk az űrlapot a jelenlegi adatokkal
         form = TetelsorEditForm(instance=tetelsor)
+    context = {'form': form, 'tetelsor': tetelsor}
+    return render(request, 'projects/tetelsor_edit_form.html', context)
 
+
+# === EZ A TELJESEN ÚJ NÉZET A TÉTELSOR TÖRLÉSÉHEZ (Kérés 1) ===
+def tetelsor_delete(request, pk):
+    """
+    Nézet egyetlen tételsor végleges törléséhez.
+    'pk' a TETELSOR azonosítója.
+    """
+    tetelsor = get_object_or_404(Tetelsor, id=pk)
+    project_id = tetelsor.project.id  # Mentsük el az ID-t az átirányításhoz
+
+    if request.method == 'POST':
+        tetelsor.delete()
+        # Visszairányítjuk a felhasználót a projekt oldalára
+        return redirect('project-detail', pk=project_id)
+
+    # GET kérés: Mutassuk a megerősítő oldalt
     context = {
-        'form': form,
         'tetelsor': tetelsor
     }
-    return render(request, 'projects/tetelsor_edit_form.html', context)
+    return render(request, 'projects/tetelsor_confirm_delete.html', context)
