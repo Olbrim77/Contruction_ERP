@@ -13,11 +13,23 @@
             max-width: 800px;
         }
         h1 { color: #333; border-bottom: 2px solid #005a9c; }
+        /* CSS GRID BEÁLLÍTÁSOK a két oszlopos megjelenítéshez */
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 40px;
+        }
         form p {
-            margin-bottom: 15px;
+            margin-bottom: 5px;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
         }
+        /* A fő mezők, mint a leírás, legyenek teljes szélességűek */
+        form #id_leiras_container,
+        form #id_megjegyzes_container {
+            grid-column: 1 / 3;
+        }
+
         form label { display: block; font-weight: bold; margin-bottom: 5px; }
         form input, form textarea, form select {
             width: 95%;
@@ -26,6 +38,7 @@
             border-radius: 4px;
         }
         button {
+            grid-column: 1 / 3;
             background-color: #005a9c;
             color: white;
             padding: 10px 20px;
@@ -33,6 +46,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 1em;
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -48,13 +62,60 @@
         <form method="POST">
             {% csrf_token %}
 
-            {{ form.as_p }}
+            <div id="id_leiras_container">
+                <label for="{{ form.leiras.id_for_label }}">{{ form.leiras.label }}</label>
+                {{ form.leiras }}
+            </div>
+
+            <p>
+                <label for="{{ form.material.id_for_label }}">{{ form.material.label }}</label>
+                {{ form.material }}
+            </p>
+            <p>
+                <label for="{{ form.anyag_egysegar.id_for_label }}">{{ form.anyag_egysegar.label }}</label>
+                {{ form.anyag_egysegar }}
+            </p>
+            <p>
+                <label for="{{ form.normaido.id_for_label }}">{{ form.normaido.label }}</label>
+                {{ form.normaido }}
+            </p>
+
+            <p>
+                <label for="{{ form.progress_percentage.id_for_label }}">{{ form.progress_percentage.label }}</label>
+                {{ form.progress_percentage }}
+            </p>
+            <p>
+                <label for="{{ form.labor_split_percentage.id_for_label }}">{{ form.labor_split_percentage.label }}</label>
+                {{ form.labor_split_percentage }}
+            </p>
+            <p>
+                <label for="{{ form.munkanem.id_for_label }}">{{ form.munkanem.label }}</label>
+                {{ form.munkanem }}
+            </p>
+            <p>
+                <label for="{{ form.alvallalkozo.id_for_label }}">{{ form.alvallalkozo.label }}</label>
+                {{ form.alvallalkozo }}
+            </p>
+
+
+            <p>
+                <label for="{{ form.engy_kod.id_for_label }}">{{ form.engy_kod.label }}</label>
+                {{ form.engy_kod }}
+            </p>
+            <p>
+                <label for="{{ form.k_jelzo.id_for_label }}">{{ form.k_jelzo.label }}</label>
+                {{ form.k_jelzo }}
+            </p>
+            <div id="id_megjegyzes_container">
+                <label for="{{ form.megjegyzes.id_for_label }}">{{ form.megjegyzes.label }}</label>
+                {{ form.megjegyzes }}
+            </div>
 
             <button type="submit">Módosítások Mentése</button>
         </form>
 
         <hr>
-        <a href="{% url 'project-detail' tetelsor.project.id %}" style="color: #555;">Mégse (Vissza a projekthez)</a>
+        <a href="{% url 'project-detail' tetelsor.project.id %}" style="color: #555;">&laquo; Mégse (Vissza a projekthez)</a>
     </div>
 </body>
 </html>

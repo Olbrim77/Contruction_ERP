@@ -1,46 +1,42 @@
-# projects/admin.py
 from django.contrib import admin
-from .models import Project, Task  # Importáljuk a modelljeinket
-
-
-# ---
-# Ez a rész teszi "széppé" és használhatóvá az admin felületet.
-# ---
+from .models import Project, Task, Munkanem, Alvallalkozo, Tetelsor, Expense, DailyLog, Supplier, Material
 
 class TaskInline(admin.TabularInline):
-    """
-    Ez a 'segéd' osztály teszi lehetővé, hogy a Projekt admin oldalán 
-    közvetlenül szerkeszthessük a hozzá tartozó Feladatokat.
-    'TabularInline' nézetet használunk a kompaktabb megjelenésért.
-    """
     model = Task
-    extra = 1  # Alapból 1 üres sort mutat új feladat felvételéhez
+    extra = 1
 
-
-@admin.register(Project)  # Ez a "dekorátor" regisztrálja a Project modellt
+@admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    """
-    Itt szabjuk testre a 'Projektek' listájának és szerkesztőjének kinézetét.
-    """
-    # Mely oszlopok jelenjenek meg a projekt listában
-    list_display = ('name', 'client', 'location', 'status', 'start_date', 'end_date')
-
-    # Milyen szűrőket tegyünk az oldalsávra
+    list_display = ('name', 'client', 'location', 'status', 'start_date', 'end_date', 'hourly_rate', 'vat_rate')
     list_filter = ('status', 'client')
-
-    # Mely mezők alapján működjön a keresés
     search_fields = ('name', 'location', 'client')
-
-
-    # Ide ágyazzuk be a fenti 'TaskInline' osztályt
     inlines = [TaskInline]
 
-
-@admin.register(Task)  # Regisztráljuk a Task modellt is
+@admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    """
-    Itt szabjuk testre a 'Feladatok' listájának kinézetét.
-    """
     list_display = ('name', 'project', 'status', 'due_date')
     list_filter = ('status', 'project')
     search_fields = ('name', 'description')
+
+admin.site.register(Munkanem)
+admin.site.register(Alvallalkozo)
+admin.site.register(Supplier)
+admin.site.register(Material)
+
+@admin.register(Expense)
+class ExpenseAdmin(admin.ModelAdmin):
+    list_display = ('project', 'name', 'date', 'amount_netto', 'category')
+    list_filter = ('project', 'category', 'date')
+    date_hierarchy = 'date'
+
+@admin.register(Tetelsor)
+class TetelsorAdmin(admin.ModelAdmin):
+    list_display = ('tetelszam', 'leiras', 'project', 'mennyiseg', 'material', 'anyag_osszesen', 'sajat_munkadij_osszesen', 'alv_munkadij_osszesen', 'progress_percentage')
+    list_filter = ('project', 'munkanem', 'alvallalkozo')
+    search_fields = ('tetelszam', 'leiras')
+
+@admin.register(DailyLog)
+class DailyLogAdmin(admin.ModelAdmin):
+    list_display = ('project', 'date', 'workforce', 'weather')
+    list_filter = ('project', 'weather', 'workforce')
+    date_hierarchy = 'date'

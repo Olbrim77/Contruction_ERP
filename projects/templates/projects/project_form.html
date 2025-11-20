@@ -2,51 +2,65 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-
     <title>
-        {% if form.instance.pk %}
-            Projekt Szerkesztése: {{ form.instance.name }}
-        {% else %}
-            Új Projekt Létrehozása
-        {% endif %}
+        {% if project %}Projekt Szerkesztése: {{ project.name }}{% else %}Új Projekt Létrehozása{% endif %}
     </title>
 
     <style>
         body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
+        .container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            max-width: 600px;
+        }
         h1 { color: #333; border-bottom: 2px solid #005a9c; }
-        form { background-color: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 20px; max-width: 600px; }
         form p { margin-bottom: 15px; }
         form label { display: block; font-weight: bold; margin-bottom: 5px; }
-        form input[type="text"], form input[type="date"], form input[type="number"] { width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        button { background-color: #005a9c; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
-        button:hover { background-color: #004a80; }
-        .back-link { display: inline-block; margin-top: 20px; color: #555; }
+        form input[type="text"],
+        form input[type="date"],
+        form input[type="number"],
+        form input[type="email"] {
+            width: 95%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #005a9c;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #004a80;
+        }
     </style>
 </head>
 <body>
 
     <h1>
-        {% if form.instance.pk %}
-            Projekt Szerkesztése: {{ form.instance.name }}
-        {% else %}
-            Új Projekt Felvitele
-        {% endif %}
+        {% if project %}Projekt Szerkesztése: {{ project.name }}{% else %}Új Projekt Felvitele{% endif %}
     </h1>
 
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
+    <div class="container">
+        <form method="POST">
+            {% csrf_token %}
 
-        <button type="submit">
-            {% if form.instance.pk %}
-                Módosítások Mentése
-            {% else %}
-                Projekt Mentése
-            {% endif %}
-        </button>
-    </form>
+            {{ form.as_p }}
 
-    <a href="{% url 'project-list' %}" class="back-link">&laquo; Vissza a listára (mentés nélkül)</a>
+            <button type="submit">
+                {% if project %}Módosítások Mentése{% else %}Projekt Mentése{% endif %}
+            </button>
+        </form>
 
+        <hr>
+        <a href="{% if project %}{% url 'project-detail' project.id %}{% else %}{% url 'project-list' %}{% endif %}"
+           style="color: #555;">&laquo; Vissza a projekthez / listára</a>
+    </div>
 </body>
 </html>
