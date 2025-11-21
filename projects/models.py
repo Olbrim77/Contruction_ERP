@@ -1,5 +1,6 @@
+# projects/models.py
 from django.db import models
-from decimal import Decimal
+from decimal import Decimal  # Fontos import
 
 
 class Project(models.Model):
@@ -22,31 +23,22 @@ class Project(models.Model):
 
     def __str__(self): return self.name
 
-    class Meta:
-        verbose_name = "Projekt"
-        verbose_name_plural = "Projektek"
+    class Meta: verbose_name, verbose_name_plural = "Projekt", "Projektek"
 
 
 class Task(models.Model):
-    STATUS_CHOICES = [('FUGGO', 'Függőben'), ('FOLYAMATBAN', 'Folyamatban'), ('FELULVIZSG', 'Felülvizsgálat alatt'),
-                      ('KESZ', 'Kész'), ]
-    project = models.ForeignKey(Project, related_name='tasks', on_delete=models.CASCADE,
-                                verbose_name="Kapcsolódó Projekt")
-    name = models.CharField(max_length=200, verbose_name="Feladat neve")
-    description = models.TextField(verbose_name="Részletes leírás", blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='FUGGO', verbose_name="Státusz")
-    due_date = models.DateField(verbose_name="Határidő", null=True, blank=True)
+    STATUS_CHOICES = [('FUGGO', 'Függőben'), ('KESZ', 'Kész')]
+    project = models.ForeignKey(Project, related_name='tasks', on_delete=models.CASCADE)
+    name = models.CharField(max_length=200);
+    description = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='FUGGO');
+    due_date = models.DateField(null=True)
 
-    def __str__(self): return f"[{self.project.name}] - {self.name}"
-
-    class Meta:
-        verbose_name = "Feladat"
-        verbose_name_plural = "Feladatok"
-        ordering = ['status', 'due_date']
+    class Meta: verbose_name, verbose_name_plural = "Feladat", "Feladatok"
 
 
 class Munkanem(models.Model):
-    nev = models.CharField(max_length=150, unique=True, verbose_name="Munkanem neve")
+    nev = models.CharField(max_length=150, unique=True);
 
     def __str__(self): return self.nev
 
@@ -54,9 +46,8 @@ class Munkanem(models.Model):
 
 
 class Alvallalkozo(models.Model):
-    nev = models.CharField(max_length=200, verbose_name="Alvállalkozó neve")
-    munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True,
-                                 verbose_name="Kapcsolódó munkanem")
+    nev = models.CharField(max_length=200);
+    munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self): return self.nev
 
@@ -64,10 +55,7 @@ class Alvallalkozo(models.Model):
 
 
 class Supplier(models.Model):
-    name = models.CharField(max_length=200, verbose_name="Beszállító neve")
-    contact = models.CharField(max_length=200, blank=True, verbose_name="Kapcsolattartó")
-    phone = models.CharField(max_length=50, blank=True, verbose_name="Telefonszám")
-    email = models.EmailField(blank=True)
+    name = models.CharField(max_length=200);
 
     def __str__(self): return self.name
 
@@ -75,102 +63,152 @@ class Supplier(models.Model):
 
 
 class Material(models.Model):
-    name = models.CharField(max_length=200, unique=True, verbose_name="Anyag neve/kódja")
-    unit = models.CharField(max_length=20, verbose_name="Egység (pl. db, m3, zsák)")
-    price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Aktuális egységár (Nettó)")
-    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True,
-                                 verbose_name="Fő Beszállító")
+    name = models.CharField(max_length=200, unique=True);
+    unit = models.CharField(max_length=20);
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
 
-    def __str__(self): return f"{self.name} ({self.price} Ft/{self.unit})"
+    def __str__(self): return f"{self.name} ({self.price} Ft)"
 
     class Meta: verbose_name, verbose_name_plural = "Anyag", "Anyagok"
 
 
+class MasterItem(models.Model):
+    tetelszam = models.CharField(max_length=100, unique=True, verbose_name="Tételszám")
+    leiras = models.TextField(verbose_name="Leírás")
+    egyseg = models.CharField(max_length=20, verbose_name="Egység")
+    normaido = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Normaidő")
+    munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True)
+    fix_anyag_ar = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Fix Anyagár")
+    engy_kod = models.CharField(max_length=50, blank=True, null=True)
+    k_jelzo = models.CharField(max_length=50, blank=True, null=True)
+    cpr_kod = models.CharField(max_length=50, blank=True, null=True)
+
+    @property
+    def calculated_material_cost(self):
+        components = self.components.all()
+        if components.exists(): return sum(c.amount * c.material.price for c in components)
+        return self.fix_anyag_ar
+
+    def __str__(self): return f"{self.tetelszam}"
+
+    class Meta: verbose_name, verbose_name_plural = "Törzs Tétel", "Törzs Tételek"
+
+
+class ItemComponent(models.Model):
+    master_item = models.ForeignKey(MasterItem, related_name='components', on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, on_delete=models.CASCADE);
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+
 class Tetelsor(models.Model):
-    project = models.ForeignKey(Project, related_name='tetelsorok', on_delete=models.CASCADE,
-                                verbose_name="Kapcsolódó Projekt")
-    sorszam = models.CharField(max_length=50, verbose_name="Sorszám", blank=True)
-    tetelszam = models.CharField(max_length=100, verbose_name="Tételszám", db_index=True)
-    leiras = models.TextField(verbose_name="Leírás (Feladat)")
-    mennyiseg = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Mennyiség")
-    egyseg = models.CharField(max_length=20, verbose_name="Egység (ME)", blank=True)
-    material = models.ForeignKey(Material, on_delete=models.SET_NULL, null=True, blank=True,
-                                 verbose_name="Kapcsolódó Anyag")
+    project = models.ForeignKey(Project, related_name='tetelsorok', on_delete=models.CASCADE)
+    master_item = models.ForeignKey(MasterItem, on_delete=models.PROTECT, verbose_name="Törzs Tétel")
 
-    labor_split_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100.00,
-                                                 verbose_name="Saját munka felosztás (%)")
-    dij_egysegre_sajat = models.DecimalField(max_digits=12, decimal_places=2, default=0,
-                                             verbose_name="Díj Egységre (Saját)")
-    dij_egysegre_alv = models.DecimalField(max_digits=12, decimal_places=2, default=0,
-                                           verbose_name="Díj Egységre (Alváll.)")
-    sajat_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0,
-                                                  verbose_name="Saját Munkadíj Összesen")
-    alv_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0,
-                                                verbose_name="Alvállalkozói Díj Összesen")
-    progress_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00,
-                                              verbose_name="Készültségi fok (%)")
+    sorszam = models.CharField(max_length=50, blank=True)
+    mennyiseg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    alvallalkozo = models.ForeignKey(Alvallalkozo, on_delete=models.SET_NULL, null=True, blank=True)
+    megjegyzes = models.TextField(blank=True, null=True)
 
-    anyag_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Anyag Összesen")
-    megjegyzes = models.TextField(verbose_name="Megjegyzés", blank=True, null=True)
-    engy_kod = models.CharField(max_length=50, verbose_name="ÉNGY kód", blank=True, null=True)
-    k_jelzo = models.CharField(max_length=50, verbose_name="K.jelző", blank=True, null=True)
-    munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Munkanem")
-    normaido = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Normaidő (óra)")
-    alvallalkozo = models.ForeignKey(Alvallalkozo, on_delete=models.SET_NULL, null=True, blank=True,
-                                     verbose_name="Alvállalkozó")
-    cpr_kod = models.CharField(max_length=50, verbose_name="CPR kód", blank=True, null=True)
+    # Kézi felülbírálások
+    anyag_egysegar = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    material = models.ForeignKey(Material, on_delete=models.SET_NULL, null=True, blank=True)
+
+    labor_split_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100.00)
+    progress_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+
+    # Számított mezők
+    anyag_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    dij_egysegre_sajat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    dij_egysegre_alv = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sajat_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    alv_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     def save(self, *args, **kwargs):
-        rate = self.project.hourly_rate or Decimal(0)
-        norma = self.normaido or Decimal(0)
-        mennyiseg = self.mennyiseg or Decimal(0)
-        split_percent = self.labor_split_percentage / Decimal(100)
+        # === JAVÍTÁS: Kényszerített Decimal konverzió a hiba elkerülésére ===
+        rate = Decimal(str(self.project.hourly_rate or 0))
+        norma = Decimal(str(self.master_item.normaido or 0))
+        mennyiseg = Decimal(str(self.mennyiseg or 0))
+        split_percent = Decimal(str(self.labor_split_percentage or 100)) / Decimal(100)
 
+        # Anyagár logika
         if self.material and self.material.price is not None:
-            self.anyag_osszesen = mennyiseg * self.material.price
-        else:
-            self.anyag_osszesen = Decimal(0)
+            self.anyag_egysegar = self.material.price
+        elif not self.anyag_egysegar:  # Ha 0 vagy None
+            self.anyag_egysegar = self.master_item.calculated_material_cost or Decimal(0)
 
-        full_labor_cost_unit = rate * norma
-        self.dij_egysegre_sajat = full_labor_cost_unit * split_percent
-        self.dij_egysegre_alv = full_labor_cost_unit * (Decimal(1) - split_percent)
+        # Biztosítjuk, hogy az anyag_egysegar is Decimal legyen
+        price = Decimal(str(self.anyag_egysegar or 0))
+        self.anyag_osszesen = mennyiseg * price
+
+        # Munkadíj számítás
+        full_labor_unit = rate * norma
+        self.dij_egysegre_sajat = full_labor_unit * split_percent
+        self.dij_egysegre_alv = full_labor_unit * (Decimal(1) - split_percent)
         self.sajat_munkadij_osszesen = mennyiseg * self.dij_egysegre_sajat
         self.alv_munkadij_osszesen = mennyiseg * self.dij_egysegre_alv
         super().save(*args, **kwargs)
 
+    # Proxy property-k
+    @property
+    def tetelszam(self):
+        return self.master_item.tetelszam
+
+    @property
+    def leiras(self):
+        return self.master_item.leiras
+
+    @property
+    def egyseg(self):
+        return self.master_item.egyseg
+
+    @property
+    def munkanem(self):
+        return self.master_item.munkanem
+
+    @property
+    def normaido(self):
+        return self.master_item.normaido
+
+    @property
+    def engy_kod(self):
+        return self.master_item.engy_kod
+
+    @property
+    def k_jelzo(self):
+        return self.master_item.k_jelzo
+
+    @property
+    def cpr_kod(self):
+        return self.master_item.cpr_kod
+
     def __str__(self):
-        return f"{self.tetelszam} - {self.leiras[:50]}"
+        return f"{self.master_item.tetelszam}"
 
     class Meta:
-        verbose_name, verbose_name_plural, unique_together = "Tételsor", "Tételsorok", ('project', 'tetelszam')
+        verbose_name, verbose_name_plural, unique_together = "Projekt Tétel", "Projekt Tételek", (
+        'project', 'master_item')
 
 
 class Expense(models.Model):
-    CATEGORY_CHOICES = [('ANYAG', 'Anyagköltség'), ('MUNKADIJ', 'Munkadíj'), ('EGYEB', 'Egyéb / Általános')]
-    project = models.ForeignKey(Project, related_name='expenses', on_delete=models.CASCADE,
-                                verbose_name="Kapcsolódó Projekt")
-    name = models.CharField(max_length=200, verbose_name="Tétel megnevezése / Számlaszám")
-    date = models.DateField(verbose_name="Fizetés/Számla dátuma")
-    amount_netto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Nettó összeg (Ft)")
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='ANYAG', verbose_name="Kategória")
-    invoice_file = models.FileField(upload_to='invoices/%Y/%m/', null=True, blank=True, verbose_name="Számla kép/PDF")
+    CATEGORY_CHOICES = [('ANYAG', 'Anyagköltség'), ('MUNKADIJ', 'Munkadíj'), ('EGYEB', 'Egyéb')]
+    project = models.ForeignKey(Project, related_name='expenses', on_delete=models.CASCADE);
+    name = models.CharField(max_length=200);
+    date = models.DateField();
+    amount_netto = models.DecimalField(max_digits=12, decimal_places=2);
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='ANYAG');
+    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
 
-    def __str__(self): return f"{self.name} - {self.amount_netto} Ft"
-
-    class Meta: verbose_name, verbose_name_plural, ordering = "Kiadás / Számla", "Kiadások", ['-date']
+    class Meta: ordering = ['-date']
 
 
 class DailyLog(models.Model):
-    WEATHER_CHOICES = [('NAPOS', 'Napos'), ('FELHOS', 'Felhős'), ('ESOS', 'Esős'), ('HAVAS', 'Havas'),
-                       ('SZEL', 'Szeles')]
-    project = models.ForeignKey(Project, related_name='daily_logs', on_delete=models.CASCADE, verbose_name="Projekt")
-    date = models.DateField(unique=True, verbose_name="Dátum")
-    weather = models.CharField(max_length=10, choices=WEATHER_CHOICES, default='NAPOS', verbose_name="Időjárás")
-    workforce = models.PositiveIntegerField(verbose_name="Jelenlévő munkaerő (fő)", default=0)
-    work_done = models.TextField(verbose_name="Elvégzett munka / Haladás")
-    problems = models.TextField(verbose_name="Problémák / Események", blank=True, null=True)
+    WEATHER_CHOICES = [('NAPOS', 'Napos'), ('FELHOS', 'Felhős'), ('ESOS', 'Esős')]
+    project = models.ForeignKey(Project, related_name='daily_logs', on_delete=models.CASCADE);
+    date = models.DateField(unique=True);
+    weather = models.CharField(max_length=10, choices=WEATHER_CHOICES, default='NAPOS', verbose_name="Időjárás");
+    workforce = models.PositiveIntegerField(default=0);
+    work_done = models.TextField();
+    problems = models.TextField(blank=True, null=True, verbose_name="Problémák")
 
-    def __str__(self): return f"Napló: {self.project.name} ({self.date})"
-
-    class Meta: verbose_name, verbose_name_plural, ordering, unique_together = "Napi Jelentés", "Napi Jelentések", [
-        '-date'], ('project', 'date')
+    class Meta: ordering = ['-date']

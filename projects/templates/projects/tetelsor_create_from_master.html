@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Új Tétel Hozzáadása Törzsből</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
+        .container { background-color: #fff; border: 1px solid #ddd; padding: 20px; max-width: 600px; border-radius: 5px; }
+        h1 { color: #333; border-bottom: 2px solid #005a9c; }
+        form p { margin-bottom: 15px; }
+        form label { display: block; font-weight: bold; margin-bottom: 5px; }
+        form select, form input { width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #5cb85c; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 4px; font-size: 1em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Új Tétel Hozzáadása Törzsből</h1>
+        <h2>Projekt: {{ project.name }}</h2>
+
+        <form method="POST">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Hozzáadás a Költségvetéshez</button>
+        </form>
+
+        <hr>
+        <a href="{% url 'project-detail' project.id %}" style="color: #555;">Mégse</a>
+    </div>
+</body>
+</html>

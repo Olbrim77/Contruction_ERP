@@ -5,79 +5,68 @@
     <title>Tételsor Részletes Szerkesztése</title>
     <style>
         body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
-        .container {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 20px;
-            max-width: 800px;
-        }
+        .container { background-color: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 20px; max-width: 800px; }
         h1 { color: #333; border-bottom: 2px solid #005a9c; }
-        /* CSS GRID BEÁLLÍTÁSOK a két oszlopos megjelenítéshez */
-        form {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px 40px;
+
+        /* Info box a törzsadatoknak */
+        .master-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #005a9c;
         }
-        form p {
-            margin-bottom: 5px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        /* A fő mezők, mint a leírás, legyenek teljes szélességűek */
-        form #id_leiras_container,
-        form #id_megjegyzes_container {
-            grid-column: 1 / 3;
+        .master-info h3 { margin-top: 0; color: #555; }
+        .master-data-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.9em; margin-top: 10px;
         }
 
+        form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; }
+        form p { margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        form #id_megjegyzes_container { grid-column: 1 / 3; }
         form label { display: block; font-weight: bold; margin-bottom: 5px; }
-        form input, form textarea, form select {
-            width: 95%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            grid-column: 1 / 3;
-            background-color: #005a9c;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-            margin-top: 15px;
-        }
+        form input, form textarea, form select { width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { grid-column: 1 / 3; background-color: #005a9c; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; margin-top: 15px; }
+        button:hover { background-color: #004a80; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Tételsor Részletes Szerkesztése</h1>
 
-        <p><strong>Projekt:</strong> {{ tetelsor.project.name }}</p>
-        <p><strong>Tételszám:</strong> {{ tetelsor.tetelszam }}</p>
+        <div class="master-info">
+            <h3>Törzs Tétel: {{ tetelsor.tetelszam }}</h3>
+            <p><strong>Leírás:</strong> {{ tetelsor.leiras }}</p>
+
+            <div class="master-data-grid">
+                <div><strong>Egység:</strong> {{ tetelsor.egyseg }}</div>
+                <div><strong>Normaidő:</strong> {{ tetelsor.normaido }} óra</div>
+                <div><strong>Munkanem:</strong> {{ tetelsor.munkanem|default:"-" }}</div>
+
+                <div><strong>ÉNGY kód:</strong> {{ tetelsor.engy_kod|default:"-" }}</div>
+                <div><strong>K. jelző:</strong> {{ tetelsor.k_jelzo|default:"-" }}</div>
+                <div><strong>CPR kód:</strong> {{ tetelsor.cpr_kod|default:"-" }}</div>
+
+                <div><strong>Fix Anyagár:</strong> {{ tetelsor.master_item.fix_anyag_ar }} Ft</div>
+            </div>
+            <p style="margin-top:10px; font-style:italic; font-size:0.8em;">
+                Ezek az adatok a Központi Törzsből származnak. Ha módosítani szeretnéd őket, importálj új verziót, vagy szerkeszd a Törzset az admin felületen.
+            </p>
+        </div>
 
         <hr>
 
         <form method="POST">
             {% csrf_token %}
 
-            <div id="id_leiras_container">
-                <label for="{{ form.leiras.id_for_label }}">{{ form.leiras.label }}</label>
-                {{ form.leiras }}
-            </div>
+            <p>
+                <label for="{{ form.mennyiseg.id_for_label }}">{{ form.mennyiseg.label }}</label>
+                {{ form.mennyiseg }}
+            </p>
 
             <p>
-                <label for="{{ form.material.id_for_label }}">{{ form.material.label }}</label>
-                {{ form.material }}
-            </p>
-            <p>
-                <label for="{{ form.anyag_egysegar.id_for_label }}">{{ form.anyag_egysegar.label }}</label>
-                {{ form.anyag_egysegar }}
-            </p>
-            <p>
-                <label for="{{ form.normaido.id_for_label }}">{{ form.normaido.label }}</label>
-                {{ form.normaido }}
+                <label for="{{ form.alvallalkozo.id_for_label }}">{{ form.alvallalkozo.label }}</label>
+                {{ form.alvallalkozo }}
             </p>
 
             <p>
@@ -88,24 +77,7 @@
                 <label for="{{ form.labor_split_percentage.id_for_label }}">{{ form.labor_split_percentage.label }}</label>
                 {{ form.labor_split_percentage }}
             </p>
-            <p>
-                <label for="{{ form.munkanem.id_for_label }}">{{ form.munkanem.label }}</label>
-                {{ form.munkanem }}
-            </p>
-            <p>
-                <label for="{{ form.alvallalkozo.id_for_label }}">{{ form.alvallalkozo.label }}</label>
-                {{ form.alvallalkozo }}
-            </p>
 
-
-            <p>
-                <label for="{{ form.engy_kod.id_for_label }}">{{ form.engy_kod.label }}</label>
-                {{ form.engy_kod }}
-            </p>
-            <p>
-                <label for="{{ form.k_jelzo.id_for_label }}">{{ form.k_jelzo.label }}</label>
-                {{ form.k_jelzo }}
-            </p>
             <div id="id_megjegyzes_container">
                 <label for="{{ form.megjegyzes.id_for_label }}">{{ form.megjegyzes.label }}</label>
                 {{ form.megjegyzes }}
