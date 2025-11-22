@@ -4,60 +4,109 @@
     <meta charset="UTF-8">
     <title>Gantt Diagram - {{ project.name }}</title>
     <link rel="stylesheet" href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css">
+
     <style>
-        html, body { height: 100%; padding: 0; margin: 0; overflow: hidden; }
-        #gantt_here { width: 100%; height: 100%; }
+        html, body {
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gantt_here {
+            width: 100%;
+            height: 100%;
+        }
+        .gantt-controls {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
         .back-btn {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            z-index: 999;
             background-color: #005a9c;
             color: white;
-            padding: 10px 15px;
+            padding: 8px 15px;
             text-decoration: none;
-            border-radius: 5px;
+            border-radius: 4px;
             font-weight: bold;
-            font-family: sans-serif;
         }
+        .back-btn:hover {
+            background-color: #004a80;
+        }
+        h2 { margin: 0; font-size: 1.2em; color: #333; }
+
+        /* === ÚJ STÍLUSOK A ZÖLD KÉSZÜLTSÉGHEZ === */
+
+        /* 1. A Feladat alapcsíkja (Legyen szürke, hogy a zöld jól látszódjon) */
+        .gantt_task_line {
+            background-color: #6c757d;
+            border: 1px solid #5a6268;
+        }
+
+        /* 2. A Készültség (Progress) csíkja -> ZÖLD */
+        .gantt_task_progress {
+            background-color: #28a745; /* Élénk zöld */
+            border: 1px solid #1e7e34;
+            opacity: 0.8;
+        }
+
+        /* Szöveg színe a csíkon belül */
+        .gantt_task_content {
+            color: #fff;
+            font-weight: bold;
+        }
+
     </style>
 </head>
 <body>
 
-    <a href="{% url 'project-detail' project.id %}" class="back-btn">Vissza a Projekthez</a>
+    <div class="gantt-controls">
+        <h2>{{ project.name }} - Ütemezés</h2>
+        <a href="{% url 'project-detail' project.id %}" class="back-btn">&laquo; Vissza a Projekthez</a>
+    </div>
 
     <div id="gantt_here"></div>
 
     <script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
 
     <script>
-        // Konfiguráció
-        gantt.config.date_format = "%Y-%m-%d"; // Ahogy a Django küldi
+        // Dátum formátum beállítása
+        gantt.config.date_format = "%Y-%m-%d";
         gantt.config.xml_date = "%Y-%m-%d";
+
+        // Oszlopok konfigurálása
         gantt.config.columns = [
             {name:"text", label:"Feladat neve", width:"*", tree:true },
-            {name:"start_date", label:"Kezdés", align:"center" },
-            {name:"duration", label:"Napok", align:"center" },
-            {name:"add", label:"", width:44 }
+            {name:"start_date", label:"Kezdés", align:"center", width:90 },
+            {name:"duration", label:"Napok", align:"center", width:60 },
+            {name:"mennyiseg", label:"Mennyiség", align:"center", width:80 },
+            // Progress oszlop megjelenítése százalékosan
+            {name:"progress", label:"Kész (%)", align:"center", template: function(obj) {
+                return Math.round(obj.progress * 100) + "%";
+            }, width:60 }
         ];
 
-        // Skála beállítása (Hónap / Nap)
+        // Skála beállítása (Magyar)
+        gantt.i18n.setLocale("hu");
+
+        // Időskála
         gantt.config.scale_unit = "month";
         gantt.config.date_scale = "%F, %Y";
         gantt.config.subscales = [
-            {unit:"day", step:1, date:"%j, %D" }
+            {unit:"day", step:1, date:"%j" }
         ];
+
+        // Csak olvasás mód
+        gantt.config.readonly = true;
 
         // Inicializálás
         gantt.init("gantt_here");
 
-        // Adatok betöltése a Django API-ból
+        // Adatok betöltése
         gantt.load("{% url 'gantt-data' project.id %}", "json");
-
-        // Data Processor (Opcionális: Ha szerkeszteni is akarod a jövőben)
-        // var dp = new gantt.dataProcessor("{% url 'gantt-data' project.id %}");
-        // dp.init(gantt);
-        // dp.setTransactionMode("REST");
     </script>
 </body>
 </html>

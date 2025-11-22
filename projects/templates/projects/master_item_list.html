@@ -1,0 +1,55 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Költségvetési Adattörzs</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f6f9; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { color: #333; margin: 0; }
+        .filter-bar { background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 10px; margin-bottom: 20px; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .search-input { flex-grow: 1; }
+        .btn { padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; color: white; }
+        .btn-primary { background-color: #005a9c; } .btn-success { background-color: #28a745; } .btn-back { background-color: #6c757d; }
+
+        /* Új gomb stílus */
+        .btn-recipe { background-color: #6f42c1; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.9em; margin-right: 5px; }
+
+        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #555; font-weight: bold; }
+        tr:hover { background-color: #f1f1f1; }
+        .numeric { text-align: right; font-family: monospace; }
+        .actions a { text-decoration: none; margin-right: 10px; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📚 Költségvetési Adattörzs (Katalógus)</h1>
+        <div><a href="{% url 'project-list' %}" class="btn btn-back">Vissza a Főoldalra</a><a href="{% url 'master-item-create' %}" class="btn btn-success">+ Új Tétel</a></div>
+    </div>
+    <form method="GET" class="filter-bar">
+        <input type="text" name="q" class="search-input" placeholder="Keresés..." value="{{ search_query }}">
+        <select name="munkanem" onchange="this.form.submit()"><option value="">-- Minden Munkanem --</option>{% for m in munkanemek %}<option value="{{ m.id }}" {% if current_munkanem == m.id %}selected{% endif %}>{{ m.nev }}</option>{% endfor %}</select>
+        <button type="submit" class="btn btn-primary">Keresés</button>
+        {% if search_query or current_munkanem %}<a href="{% url 'master-item-list' %}" style="align-self: center; margin-left: 10px; color: #d9534f;">Törlés</a>{% endif %}
+    </form>
+    <table>
+        <thead><tr><th>Tételszám</th><th>Leírás</th><th>Egység</th><th>Munkanem</th><th>Norma (óra)</th><th>Alapár (Ft)</th><th>Műveletek</th></tr></thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td><strong>{{ item.tetelszam }}</strong></td><td>{{ item.leiras|truncatechars:50 }}</td><td>{{ item.egyseg }}</td><td>{{ item.munkanem|default:"-" }}</td><td class="numeric">{{ item.normaido }}</td><td class="numeric">{{ item.fix_anyag_ar|floatformat:0|intcomma }}</td>
+                <td class="actions">
+                    <a href="{% url 'master-item-components' item.id %}" class="btn-recipe" title="Anyagok / Receptúra">🧪 Recept</a>
+                    <a href="{% url 'master-item-update' item.id %}" title="Szerkesztés">✏️</a>
+                    <a href="{% url 'master-item-delete' item.id %}" title="Törlés" style="color: red;">🗑️</a>
+                </td>
+            </tr>
+            {% empty %}<tr><td colspan="7" style="text-align: center; padding: 20px;">Nincs találat.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
