@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Katalógus Import</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f6f9; }
+        .container { background-color: #fff; padding: 30px; max-width: 600px; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #005a9c; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .info-box { background-color: #e7f1ff; border-left: 5px solid #005a9c; padding: 15px; margin-bottom: 20px; color: #333; }
+        button { background-color: #28a745; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1.1em; width: 100%; }
+        button:hover { background-color: #218838; }
+        a { display: block; text-align: center; margin-top: 15px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📥 Katalógus Importálás</h1>
+
+        <div class="info-box">
+            <p><strong>Tölts fel egy Excel (.xlsx) fájlt.</strong></p>
+            <p>Azonosító: <strong>Tételszám (A oszlop)</strong>.</p>
+            <p>Ha létezik, frissíti. Ha nem, újat hoz létre.</p>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight:bold;">Excel Fájl:</label>
+                <input type="file" name="excel_file" accept=".xlsx" required style="width:100%; padding:10px;">
+            </div>
+            <button type="submit">Feltöltés és Import</button>
+        </form>
+
+        <a href="{% url 'master-item-list' %}">Mégse</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Betűtípus Választása</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f6f9; text-align: center; }
+        .container { background: #fff; max-width: 600px; margin: 0 auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #005a9c; }
+        .font-list { list-style: none; padding: 0; margin-top: 20px; }
+        .font-item { margin-bottom: 15px; }
+        .font-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            font-size: 1.2em;
+            transition: background 0.2s;
+        }
+        .font-btn:hover { background-color: #e2e6ea; border-color: #005a9c; }
+        .preview { font-size: 0.9em; color: #666; margin-top: 5px; display: block; }
+        .back-link { display: inline-block; margin-top: 20px; color: #6c757d; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Válassz Betűtípust</h1>
+        <p>A következő .ttf fájlokat találtuk a <code>projects/static/fonts/</code> mappában:</p>
+
+        <ul class="font-list">
+            {% for font in font_files %}
+            <li class="font-item">
+                <a href="{% url 'project-quote-pdf' project.id %}?font={{ font }}" class="font-btn">
+                    {{ font }}
+                    <span class="preview">Árvíztűrő tükörfúrógép ({{ font }})</span>
+                </a>
+            </li>
+            {% empty %}
+            <li style="color: red;">Nem található .ttf fájl a mappában! Másold be a Windows betűtípusokat.</li>
+            {% endfor %}
+        </ul>
+
+        <a href="{% url 'project-detail' project.id %}" class="back-link">Mégse</a>
+    </div>
+</body>
+</html>

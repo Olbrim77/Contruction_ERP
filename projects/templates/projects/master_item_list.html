@@ -1,55 +1,102 @@
+{% extends 'projects/base.html' %}
 {% load humanize %}
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8">
-    <title>Költségvetési Adattörzs</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; background-color: #f4f6f9; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        h1 { color: #333; margin: 0; }
-        .filter-bar { background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 10px; margin-bottom: 20px; }
-        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        .search-input { flex-grow: 1; }
-        .btn { padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; color: white; }
-        .btn-primary { background-color: #005a9c; } .btn-success { background-color: #28a745; } .btn-back { background-color: #6c757d; }
 
-        /* Új gomb stílus */
-        .btn-recipe { background-color: #6f42c1; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.9em; margin-right: 5px; }
+{% block title %}Költségvetési Adattörzs - Kocsis Építő{% endblock %}
 
-        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #f8f9fa; color: #555; font-weight: bold; }
-        tr:hover { background-color: #f1f1f1; }
-        .numeric { text-align: right; font-family: monospace; }
-        .actions a { text-decoration: none; margin-right: 10px; font-size: 1.2em; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>📚 Költségvetési Adattörzs (Katalógus)</h1>
-        <div><a href="{% url 'project-list' %}" class="btn btn-back">Vissza a Főoldalra</a><a href="{% url 'master-item-create' %}" class="btn btn-success">+ Új Tétel</a></div>
+{% block breadcrumbs %}
+    <a href="{% url 'project-list' %}">Kezdőlap</a> / <span>Katalógus</span>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* SZŰRŐ SÁV */
+    .filter-bar {
+        background-color: #fff; padding: 20px; border-radius: 8px;
+        border: 1px solid var(--border); display: flex; gap: 15px;
+        margin-bottom: 30px; align-items: center; flex-wrap: wrap;
+    }
+    .filter-group { flex-grow: 1; display: flex; gap: 10px; }
+    input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
+
+    /* TÁBLÁZAT */
+    .data-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); font-size: 14px; }
+    .data-table th { background: #f8f9fa; text-align: left; padding: 15px; color: var(--secondary); border-bottom: 1px solid #eee; }
+    .data-table td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .data-table tr:hover { background-color: #fcfcfc; }
+
+    .numeric { text-align: right; font-family: monospace; font-size: 1.1em; }
+    .badge-cat { background: #e9ecef; color: #555; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+
+    /* MŰVELETEK */
+    .actions { display: flex; gap: 5px; justify-content: center; }
+    .btn-icon {
+        width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+        border-radius: 4px; text-decoration: none; color: #555; background: #f8f9fa; border: 1px solid #ddd;
+    }
+    .btn-icon:hover { background: #e2e6ea; }
+    .btn-icon.red:hover { background: #fee2e2; color: #dc3545; border-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h2 style="margin:0;">📚 Költségvetési Adattörzs</h2>
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'master-item-import' %}" class="btn btn-secondary"><i class="fa-solid fa-file-import"></i> Excel Import</a>
+            <a href="{% url 'master-item-create' %}" class="btn btn-success"><i class="fa-solid fa-plus"></i> Új Tétel</a>
+        </div>
     </div>
+
     <form method="GET" class="filter-bar">
-        <input type="text" name="q" class="search-input" placeholder="Keresés..." value="{{ search_query }}">
-        <select name="munkanem" onchange="this.form.submit()"><option value="">-- Minden Munkanem --</option>{% for m in munkanemek %}<option value="{{ m.id }}" {% if current_munkanem == m.id %}selected{% endif %}>{{ m.nev }}</option>{% endfor %}</select>
+        <div class="filter-group">
+            <input type="text" name="q" placeholder="Keresés név vagy kód alapján..." value="{{ search_query }}">
+            <select name="munkanem" onchange="this.form.submit()">
+                <option value="">-- Minden Munkanem --</option>
+                {% for m in munkanemek %}
+                    <option value="{{ m.id }}" {% if current_munkanem == m.id %}selected{% endif %}>{{ m.nev }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary">Keresés</button>
-        {% if search_query or current_munkanem %}<a href="{% url 'master-item-list' %}" style="align-self: center; margin-left: 10px; color: #d9534f;">Törlés</a>{% endif %}
+        {% if search_query or current_munkanem %}
+            <a href="{% url 'master-item-list' %}" class="btn btn-secondary" style="background:none; color:#d9534f; border:none;">Szűrés törlése</a>
+        {% endif %}
     </form>
-    <table>
-        <thead><tr><th>Tételszám</th><th>Leírás</th><th>Egység</th><th>Munkanem</th><th>Norma (óra)</th><th>Alapár (Ft)</th><th>Műveletek</th></tr></thead>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th width="15%">Tételszám</th>
+                <th width="40%">Megnevezés</th>
+                <th width="10%">Egység</th>
+                <th width="15%">Munkanem</th>
+                <th width="10%" class="numeric">Norma</th>
+                <th width="10%" class="numeric">Anyagár</th>
+                <th width="10%" style="text-align:center;">Műveletek</th>
+            </tr>
+        </thead>
         <tbody>
             {% for item in items %}
             <tr>
-                <td><strong>{{ item.tetelszam }}</strong></td><td>{{ item.leiras|truncatechars:50 }}</td><td>{{ item.egyseg }}</td><td>{{ item.munkanem|default:"-" }}</td><td class="numeric">{{ item.normaido }}</td><td class="numeric">{{ item.fix_anyag_ar|floatformat:0|intcomma }}</td>
-                <td class="actions">
-                    <a href="{% url 'master-item-components' item.id %}" class="btn-recipe" title="Anyagok / Receptúra">🧪 Recept</a>
-                    <a href="{% url 'master-item-update' item.id %}" title="Szerkesztés">✏️</a>
-                    <a href="{% url 'master-item-delete' item.id %}" title="Törlés" style="color: red;">🗑️</a>
+                <td style="font-weight:600; color:var(--primary);">{{ item.tetelszam }}</td>
+                <td>{{ item.leiras|truncatechars:80 }}</td>
+                <td>{{ item.egyseg }}</td>
+                <td><span class="badge-cat">{{ item.munkanem|default:"-" }}</span></td>
+                <td class="numeric">{{ item.normaido }} ó</td>
+                <td class="numeric">{{ item.fix_anyag_ar|floatformat:0|intcomma }} Ft</td>
+                <td>
+                    <div class="actions">
+                        <a href="{% url 'master-item-components' item.id %}" class="btn-icon" title="Receptúra"><i class="fa-solid fa-flask"></i></a>
+                        <a href="{% url 'master-item-update' item.id %}" class="btn-icon" title="Szerkesztés"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'master-item-delete' item.id %}" class="btn-icon red" title="Törlés"><i class="fa-solid fa-trash"></i></a>
+                    </div>
                 </td>
             </tr>
-            {% empty %}<tr><td colspan="7" style="text-align: center; padding: 20px;">Nincs találat.</td></tr>{% endfor %}
+            {% empty %}
+            <tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">Nincs találat a katalógusban.</td></tr>
+            {% endfor %}
         </tbody>
     </table>
-</body>
-</html>
+
+{% endblock %}

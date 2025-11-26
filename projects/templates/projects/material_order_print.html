@@ -1,0 +1,151 @@
+{% load humanize %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Megrendelés #{{ order.id }}</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; background: #555; margin: 0; padding: 40px 0; }
+
+        .page { background: white; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 20mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; }
+
+        .controls { position: fixed; top: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; text-align: center; z-index: 1000; }
+        .btn { padding: 8px 15px; border-radius: 4px; cursor: pointer; border: none; font-size: 14px; text-decoration: none; color: white; font-weight: bold; margin: 0 10px; }
+        .btn-print { background: #28a745; } .btn-back { background: #6c757d; } .btn-toggle { background: #17a2b8; }
+
+        .logo-img { max-height: 60px; display: block; margin-bottom: 10px; }
+        .logo-img.hidden { display: none !important; }
+
+        @media print {
+            body { background: white; margin: 0; padding: 0; }
+            .page { box-shadow: none; width: 100%; margin: 0; padding: 0; }
+            .controls { display: none !important; }
+            @page { margin: 20mm; size: A4; }
+            [contenteditable="true"] { outline: none !important; background: none !important; }
+        }
+
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 30px; align-items: flex-end; }
+        .header h1 { margin: 0; color: #333; font-size: 24px; }
+        .doc-title { text-align: right; }
+        .doc-title h2 { margin: 0; font-size: 22px; text-transform: uppercase; }
+
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; font-size: 13px; }
+        .meta-box h3 { margin-top: 0; font-size: 11px; text-transform: uppercase; color: #888; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 8px; }
+        .meta-box p { margin: 3px 0; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
+        th { background: #f0f0f0; border-bottom: 2px solid #aaa; padding: 8px; text-align: left; font-weight: bold; color: #333; }
+        td { border-bottom: 1px solid #eee; padding: 8px; }
+        .numeric { text-align: right; }
+
+        .footer { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+
+        .note-box { border: 1px dashed #ccc; padding: 10px; background: #fafafa; font-size: 12px; min-height: 40px; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button onclick="toggleLogo()" class="btn btn-toggle">🖼️ Logó Ki/Be</button>
+        <button onclick="window.print()" class="btn btn-print">🖨️ Nyomtatás / PDF Mentés</button>
+        <a href="{% url 'project-detail' order.project.id %}" class="btn btn-back">Vissza</a>
+    </div>
+
+    <div class="page">
+        <div class="header">
+            <div class="logo-area">
+                {% if company_logo %}
+                    <img src="{{ company_logo.url }}" id="companyLogo" class="logo-img" alt="Logó">
+                {% endif %}
+                <h1>{{ company_name }}</h1>
+            </div>
+            <div class="doc-title">
+                <h2>MEGRENDELÉS</h2>
+                <div style="font-size: 14px;">Rendelésszám: <strong>#{{ order.id }}</strong></div>
+                <div style="font-size: 12px; margin-top: 5px;">
+                    Kelt: <span contenteditable="true">{{ default_city }}, {{ order.date|date:"Y.m.d" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="meta-grid">
+            <div class="meta-box">
+                <h3>Megrendelő (Számlázási Cím)</h3>
+                <p><strong>{{ company_name }}</strong></p>
+                <p>{{ company_address }}</p>
+                <p>Adószám: {{ company_tax }}</p>
+                <p>Kapcsolattartó: {{ signatories.first.name|default:"Ügyvezető" }}</p>
+                <p>Tel: {{ company_phone }}</p>
+            </div>
+            <div class="meta-box">
+                <h3>Beszállító</h3>
+                <p><strong>{{ order.supplier.name }}</strong></p>
+                {% if order.supplier.contact_person %}<p>Kapcsolattartó: {{ order.supplier.contact_person }}</p>{% endif %}
+                {% if order.supplier.email %}<p>Email: {{ order.supplier.email }}</p>{% endif %}
+                {% if order.supplier.phone %}<p>Tel: {{ order.supplier.phone }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div class="meta-box" style="margin-bottom: 30px;">
+             <h3>Szállítási Cím (Projekt Helyszín)</h3>
+             <p contenteditable="true"><strong>{{ order.project.location }}</strong></p>
+             <p contenteditable="true" style="font-style: italic; color: #666;">(Kérjük a szállítást erre a címre teljesíteni!)</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th width="50%">Megnevezés</th>
+                    <th width="15%" class="numeric">Mennyiség</th>
+                    <th width="15%">Egység</th>
+                    <th width="20%" class="numeric">Becsült Érték</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="numeric">{{ item.quantity|floatformat:2 }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td class="numeric">{{ item.total_price|floatformat:0|intcomma }} Ft</td>
+                </tr>
+                {% endfor %}
+                <tr style="font-weight: bold; background-color: #f0f0f0;">
+                    <td colspan="3" style="text-align: right;">Összesen (Becsült):</td>
+                    <td class="numeric">{{ total_value|floatformat:0|intcomma }} Ft</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 11px; text-transform: uppercase; color: #888; border-bottom: 1px solid #eee;">Megjegyzés / Szállítási instrukciók</h3>
+            <div class="note-box" contenteditable="true">
+                {{ order.notes|default:"Kérjük a rendelés visszaigazolását írásban megküldeni."|linebreaksbr }}
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 60px;">
+            <div style="width: 200px; text-align: center;">
+                <p>_________________________</p>
+                <p><strong>{{ company_name }}</strong><br>Megrendelő</p>
+            </div>
+            <div style="width: 200px; text-align: center;">
+                <p>_________________________</p>
+                <p><strong>{{ order.supplier.name }}</strong><br>Beszállító (Átvétel)</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            {{ company_name }} | {{ company_email }} | {{ company_address }}
+        </div>
+    </div>
+
+    <script>
+        function toggleLogo() {
+            var logo = document.getElementById('companyLogo');
+            if (logo) logo.classList.toggle('hidden');
+        }
+    </script>
+</body>
+</html>

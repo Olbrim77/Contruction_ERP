@@ -1,223 +1,98 @@
+{% extends 'projects/base.html' %}
 {% load humanize %}
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8">
-    <title>Építőipari ERP - Műszerfal</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <style>
-        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
-        h1 { color: #333; margin: 0; }
+{% block title %}Műszerfal - Kocsis Építő{% endblock %}
 
-        /* Felső sáv gombokkal */
-        .top-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
+{% block breadcrumbs %}
+    Kezdőlap / <span>Műszerfal & Projektek</span>
+{% endblock %}
 
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
+{% block extra_css %}
+<style>
+    /* KERESŐ */
+    .search-bar-container { background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 30px; display: flex; gap: 10px; }
+    .search-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
 
-        .new-project-btn {
-            background-color: #005a9c;
-            color: white;
-            padding: 12px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        .new-project-btn:hover {
-            opacity: 0.9;
-        }
+    /* DASHBOARD KÁRTYÁK */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .card { background-color: #fff; border-radius: 8px; padding: 20px; border: 1px solid var(--border); border-top: 4px solid #ccc; }
+    .card.plan { border-top-color: #005a9c; } .card.spent { border-top-color: #d9534f; } .card.balance { border-top-color: #28a745; }
+    .card h3 { margin: 0 0 10px 0; font-size: 12px; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
+    .card .value { font-size: 24px; font-weight: bold; color: var(--text-dark); }
+    .text-success { color: #28a745; } .text-danger { color: #d9534f; }
 
-        /* === KERESŐSÁV STÍLUS === */
-        .search-bar-container {
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .search-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 1em;
-        }
-        .search-btn {
-            background-color: #333;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .search-btn:hover { background-color: #555; }
-        .clear-search {
-            color: #d9534f;
-            text-decoration: none;
-            font-weight: bold;
-            padding: 0 10px;
-        }
+    /* GRAFIKONOK */
+    .charts-container { display: flex; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; }
+    .chart-box { background-color: #fff; border-radius: 8px; padding: 20px; border: 1px solid var(--border); flex: 1; min-width: 300px; height: 300px; }
 
-        /* MŰSZERFAL KÁRTYÁK */
-        .dashboard-grid { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
-        .card { background-color: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex: 1; min-width: 250px; }
-        .card h3 { margin-top: 0; color: #555; font-size: 1em; text-transform: uppercase; }
-        .card .value { font-size: 2em; font-weight: bold; color: #333; margin: 10px 0; }
-        .card .sub { font-size: 0.9em; color: #777; }
-        .balance-pos { color: #5cb85c !important; }
-        .balance-neg { color: #d9534f !important; }
+    /* PROJEKT KÁRTYÁK */
+    .project-section { margin-bottom: 40px; }
+    .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; color: #444; }
+    .counter { background: #e9ecef; color: #555; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
 
-        /* GRAFIKONOK */
-        .charts-container { display: flex; gap: 20px; margin-bottom: 40px; height: 350px; }
-        .chart-box { background-color: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex: 1; position: relative; }
+    .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .project-card {
+        background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px;
+        transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .project-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-color: var(--primary); }
+    .project-title { font-size: 18px; font-weight: 600; color: var(--primary); margin: 0 0 10px 0; }
+    .project-meta { font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 15px; }
+    .project-footer { border-top: 1px solid #f0f0f0; padding-top: 15px; margin-top: auto; display: flex; justify-content: space-between; font-size: 12px; color: #999; }
+</style>
+{% endblock %}
 
-        /* PROJEKT LISTA */
-        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-        .project-card { background-color: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s; }
-        .project-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
-        .project-card h2 { margin-top: 0; font-size: 1.4em; }
-        .project-card h2 a { color: #005a9c; text-decoration: none; }
-        .status { font-weight: bold; padding: 3px 8px; border-radius: 3px; background-color: #eee; color: #333; font-size: 0.85em; }
-    </style>
-</head>
-<body>
-
-    <div class="top-bar">
-        <h1>Vállalati Áttekintés</h1>
-
-        <div class="btn-group">
-            <a href="{% url 'master-item-list' %}" class="new-project-btn" style="background-color: #17a2b8;">📚 Adattörzs / Katalógus</a>
-
-            <a href="{% url 'project-create' %}" class="new-project-btn">+ Új Projekt Indítása</a>
-        </div>
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0;">Vállalati Áttekintés</h2>
+        <a href="{% url 'project-create' %}" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Új Projekt</a>
     </div>
 
     <form method="GET" class="search-bar-container">
         <input type="text" name="q" class="search-input" placeholder="Keresés név, helyszín vagy ügyfél alapján..." value="{{ search_query }}">
-        <button type="submit" class="search-btn">Keresés</button>
-        {% if search_query %}
-            <a href="{% url 'project-list' %}" class="clear-search" title="Keresés törlése">✖</a>
-        {% endif %}
+        <button type="submit" class="btn btn-secondary">Keresés</button>
+        {% if search_query %}<a href="{% url 'project-list' %}" style="color:#d9534f; font-weight:bold;">X</a>{% endif %}
     </form>
 
     <div class="dashboard-grid">
-        <div class="card">
-            <h3>Összes Tervezett Költség</h3>
-            <div class="value">{{ global_plan|floatformat:0|intcomma }} Ft</div>
-            <div class="sub">
-                {% if search_query %}Szűrt projektek{% else %}Minden aktív projekt{% endif %}
-            </div>
-        </div>
-        <div class="card">
-            <h3>Összes Valós Költés</h3>
-            <div class="value">{{ global_spent|floatformat:0|intcomma }} Ft</div>
-            <div class="sub">Rögzített számlák</div>
-        </div>
-        <div class="card">
-            <h3>Vállalati Egyenleg</h3>
-            <div class="value {% if global_balance >= 0 %}balance-pos{% else %}balance-neg{% endif %}">
-                {{ global_balance|floatformat:0|intcomma }} Ft
-            </div>
-            <div class="sub">Terv - Tény</div>
-        </div>
+        <div class="card plan"><h3>Tervezett Költség</h3><div class="value">{{ global_plan|floatformat:0|intcomma }} Ft</div></div>
+        <div class="card spent"><h3>Valós Költés</h3><div class="value">{{ global_spent|floatformat:0|intcomma }} Ft</div></div>
+        <div class="card balance"><h3>Egyenleg</h3><div class="value {% if global_balance >= 0 %}text-success{% else %}text-danger{% endif %}">{{ global_balance|floatformat:0|intcomma }} Ft</div></div>
     </div>
 
     <div class="charts-container">
-        <div class="chart-box">
-            <canvas id="financeChart"></canvas>
-        </div>
-        <div class="chart-box">
-            <canvas id="statusChart"></canvas>
-        </div>
+        <div class="chart-box"><canvas id="financeChart"></canvas></div>
+        <div class="chart-box"><canvas id="statusChart"></canvas></div>
     </div>
 
-    <h2>
-        {% if search_query %}Keresési találatok{% else %}Aktív Projektek{% endif %}
-    </h2>
-    <hr>
-
-    <div class="project-grid">
-        {% for p in projects_key %}
-            <div class="project-card">
-                <h2><a href="{% url 'project-detail' p.id %}">{{ p.name }}</a></h2>
-                <p class="meta">
-                    <strong>Helyszín:</strong> {{ p.location }} <br>
-                    <strong>Ügyfél:</strong> {{ p.client }} <br>
-                    <span class="status">{{ p.get_status_display }}</span>
-                </p>
+    {% for group in project_groups %}
+        <div class="project-section">
+            <div class="section-title">
+                {{ group.label }} <span class="counter">{{ group.projects.count }}</span>
             </div>
-        {% empty %}
-            <p>Nem található projekt a feltételek alapján.</p>
-        {% endfor %}
-    </div>
+            <div class="project-grid">
+                {% for p in group.projects %}
+                    <a href="{% url 'project-detail' p.id %}" class="project-card">
+                        <div class="project-title">{{ p.name }}</div>
+                        <div class="project-meta">
+                            <div><i class="fa-solid fa-location-dot"></i> {{ p.location }}</div>
+                            <div><i class="fa-solid fa-user"></i> {{ p.contact_name|default:p.client }}</div>
+                            {% if p.budget %}<div style="margin-top:5px; font-weight:bold;">💰 {{ p.budget|floatformat:0|intcomma }} Ft</div>{% endif %}
+                        </div>
+                        <div class="project-footer">
+                            <span>Kezdés: {{ p.start_date|date:"Y.m.d"|default:"-" }}</span>
+                            <span>#{{ p.id }}</span>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% empty %}
+        <div style="text-align:center; padding:50px; color:#777;"><h3>Nincsenek projektek.</h3></div>
+    {% endfor %}
 
     <script>
-        // Adatok átvétele a Django-ból
-        const plan = {{ global_plan|stringformat:"f" }};
-        const spent = {{ global_spent|stringformat:"f" }};
-
-        // Státusz adatok
-        const s_terv = {{ status_counts.TERVEZES }};
-        const s_foly = {{ status_counts.FOLYAMATBAN }};
-        const s_bef = {{ status_counts.BEFEJEZETT }};
-        const s_lez = {{ status_counts.LEZART }};
-
-        // 1. Pénzügyi Chart (Bar)
-        const ctxFinance = document.getElementById('financeChart').getContext('2d');
-        new Chart(ctxFinance, {
-            type: 'bar',
-            data: {
-                labels: ['Tervezett Költség', 'Valós Költés'],
-                datasets: [{
-                    label: 'Összeg (Ft)',
-                    data: [plan, spent],
-                    backgroundColor: ['#005a9c', '#d9534f'],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    title: { display: true, text: 'Pénzügyi Helyzet' }
-                }
-            }
-        });
-
-        // 2. Státusz Chart (Doughnut)
-        const ctxStatus = document.getElementById('statusChart').getContext('2d');
-        new Chart(ctxStatus, {
-            type: 'doughnut',
-            data: {
-                labels: ['Tervezés alatt', 'Folyamatban', 'Befejezett', 'Lezárt'],
-                datasets: [{
-                    data: [s_terv, s_foly, s_bef, s_lez],
-                    backgroundColor: ['#f0ad4e', '#5cb85c', '#0275d8', '#333'],
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: { display: true, text: 'Projektek Státusza' }
-                }
-            }
-        });
+        new Chart(document.getElementById('financeChart'), { type: 'bar', data: { labels: ['Tervezett', 'Tény'], datasets: [{ label: 'Ft', data: [{{ global_plan|stringformat:"f" }}, {{ global_spent|stringformat:"f" }}], backgroundColor: ['#005a9c', '#d9534f'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: {display:true, text:'Pénzügyek'} } } });
+        new Chart(document.getElementById('statusChart'), { type: 'doughnut', data: { labels: ['Tervezés', 'Folyamatban', 'Kész', 'Lezárt'], datasets: [{ data: [{{ status_counts.TERVEZES }}, {{ status_counts.FOLYAMATBAN }}, {{ status_counts.BEFEJEZETT }}, {{ status_counts.LEZART }}], backgroundColor: ['#ffc107', '#28a745', '#17a2b8', '#343a40'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: {display:true, text:'Státusz'}, legend:{position:'right'} } } });
     </script>
-
-</body>
-</html>
+{% endblock %}

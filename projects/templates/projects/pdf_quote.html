@@ -1,0 +1,102 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Árajánlat</title>
+    <style>
+        /* FONTOS: A font_path változót használjuk! */
+        @font-face {
+            font-family: 'DejaVuSans';
+            src: url('{{ font_path }}');
+        }
+
+        body {
+            font-family: 'DejaVuSans', sans-serif;
+            font-size: 12px;
+            color: #333;
+        }
+
+        /* ... (többi stílus ugyanaz) ... */
+        @page { size: A4; margin: 2cm; @frame footer_frame { -pdf-frame-content: footer_content; bottom: 1cm; margin-left: 2cm; margin-right: 2cm; height: 1cm; } }
+        .header { border-bottom: 2px solid #005a9c; padding-bottom: 10px; margin-bottom: 20px; }
+        .company-name { font-size: 24px; font-weight: bold; color: #005a9c; }
+        .invoice-title { font-size: 20px; font-weight: bold; text-align: right; color: #555; margin-top: -25px; }
+        .meta-table { width: 100%; margin-bottom: 30px; }
+        .meta-table td { vertical-align: top; }
+        .label { font-weight: bold; color: #666; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .items-table th { background-color: #f0f0f0; border-bottom: 1px solid #ccc; padding: 8px; text-align: left; font-weight: bold; font-size: 10px; }
+        .items-table td { border-bottom: 1px solid #eee; padding: 6px; font-size: 10px; }
+        .numeric { text-align: right; }
+        .summary-box { width: 100%; margin-top: 20px; text-align: right; }
+        .total-row td { border-top: 2px solid #333; font-weight: bold; font-size: 12px; padding-top: 10px; }
+        #footer_content { text-align: center; font-size: 9px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="invoice-title">ÁRAJÁNLAT</div>
+    </div>
+
+    <table class="meta-table">
+        <tr>
+            <td width="50%">
+                <p><span class="label">Kivitelező:</span><br>
+                {{ company_name }}<br>{{ company_address }}<br>Adószám: {{ company_tax }}<br>Tel: {{ company_phone }}</p>
+            </td>
+            <td width="50%">
+                <p><span class="label">Megrendelő:</span><br>
+                <strong>{{ project.contact_name|default:project.client }}</strong><br>
+                {{ project.contact_address|default:"-" }}<br>
+                Helyszín: {{ project.location }}</p>
+                <p><span class="label">Dátum:</span> {{ today|date:"Y.m.d" }}</p>
+            </td>
+        </tr>
+    </table>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th width="5%">#</th>
+                <th width="45%">Megnevezés</th>
+                <th width="8%">Menny.</th>
+                <th width="7%">Egység</th>
+                <th width="15%" class="numeric">Nettó Egységár</th>
+                <th width="20%" class="numeric">Nettó Összesen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tetel in tasks %}
+            <tr>
+                <td>{{ tetel.sorszam }}</td>
+                <td>{{ tetel.leiras }}</td>
+                <td>{{ tetel.mennyiseg|floatformat:2 }}</td>
+                <td>{{ tetel.egyseg }}</td>
+                <td class="numeric">{{ tetel.anyag_egysegar|add:tetel.dij_egysegre_sajat|add:tetel.dij_egysegre_alv|floatformat:0|intcomma }} Ft</td>
+                <td class="numeric">{{ tetel.anyag_osszesen|add:tetel.sajat_munkadij_osszesen|add:tetel.alv_munkadij_osszesen|floatformat:0|intcomma }} Ft</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="summary-box">
+        <table align="right" style="width: 50%;">
+            <tr><td class="numeric">Nettó Részösszeg:</td><td class="numeric">{{ total_netto|floatformat:0|intcomma }} Ft</td></tr>
+            <tr><td class="numeric">ÁFA ({{ project.vat_rate }}%):</td><td class="numeric">{{ vat_amount|floatformat:0|intcomma }} Ft</td></tr>
+            <tr class="total-row"><td class="numeric">BRUTTÓ VÉGÖSSZEG:</td><td class="numeric">{{ total_brutto|floatformat:0|intcomma }} Ft</td></tr>
+        </table>
+    </div>
+
+    <div style="margin-top: 50px;">
+        <p>Kelt: Sopron, {{ today|date:"Y.m.d" }}</p>
+        <br><br>
+        <p>_________________________<br>Aláírás</p>
+    </div>
+
+    <div id="footer_content">
+        {{ company_name }} - {{ company_email }} - Oldal <pdf:pagenumber> / <pdf:pagecount>
+    </div>
+</body>
+</html>

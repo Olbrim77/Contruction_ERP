@@ -1,66 +1,127 @@
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8">
-    <title>
-        {% if project %}Projekt Szerkesztése: {{ project.name }}{% else %}Új Projekt Létrehozása{% endif %}
-    </title>
+{% extends 'projects/base.html' %}
 
-    <style>
-        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
-        .container {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 20px;
-            max-width: 600px;
-        }
-        h1 { color: #333; border-bottom: 2px solid #005a9c; }
-        form p { margin-bottom: 15px; }
-        form label { display: block; font-weight: bold; margin-bottom: 5px; }
-        form input[type="text"],
-        form input[type="date"],
-        form input[type="number"],
-        form input[type="email"] {
-            width: 95%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #005a9c;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-        }
-        button:hover {
-            background-color: #004a80;
-        }
-    </style>
-</head>
-<body>
+{% block title %}{% if form.instance.pk %}Projekt Szerkesztése{% else %}Új Projekt{% endif %}{% endblock %}
 
-    <h1>
-        {% if project %}Projekt Szerkesztése: {{ project.name }}{% else %}Új Projekt Felvitele{% endif %}
-    </h1>
+{% block breadcrumbs %}
+    <a href="{% url 'project-list' %}">Projektek</a> /
+    <span>{% if form.instance.pk %}Szerkesztés: {{ form.instance.name }}{% else %}Új Projekt Létrehozása{% endif %}</span>
+{% endblock %}
 
-    <div class="container">
-        <form method="POST">
-            {% csrf_token %}
+{% block extra_css %}
+<style>
+    .layout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
 
-            {{ form.as_p }}
+    .section-card { background: #fff; padding: 25px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.02); margin-bottom: 20px; }
+    h3 { margin-top: 0; margin-bottom: 20px; color: var(--primary); font-size: 16px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #f4f6f9; padding-bottom: 10px; }
 
-            <button type="submit">
-                {% if project %}Módosítások Mentése{% else %}Projekt Mentése{% endif %}
-            </button>
-        </form>
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; font-size: 13px; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; box-sizing: border-box; transition: border 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; }
 
-        <hr>
-        <a href="{% if project %}{% url 'project-detail' project.id %}{% else %}{% url 'project-list' %}{% endif %}"
-           style="color: #555;">&laquo; Vissza a projekthez / listára</a>
+    .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+    .form-actions { background: #fff; padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 15px; position: sticky; bottom: 0; z-index: 10; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+
+    /* Céges mezők animációja */
+    #company-fields { display: none; background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px dashed #ccc; margin-bottom: 15px; }
+    #company-fields.visible { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="POST">
+    {% csrf_token %}
+
+    <div class="layout-grid">
+        <div class="left-column">
+            <div class="section-card">
+                <h3><i class="fa-solid fa-building"></i> Projekt Alapadatok</h3>
+                <div class="form-group"><label>Projekt Neve *</label>{{ form.name }}</div>
+                <div class="date-grid">
+                    <div class="form-group"><label>Státusz</label>{{ form.status }}</div>
+                    <div class="form-group"><label>Belső kód / Régi ügyfél</label>{{ form.client }}</div>
+                </div>
+                <div class="form-group"><label>Helyszín (Cím)</label>{{ form.location }}</div>
+            </div>
+
+            <div class="section-card">
+                <h3><i class="fa-solid fa-address-card"></i> Megrendelő Adatai</h3>
+
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; background: #e9ecef; padding: 10px; border-radius: 5px;">
+                    {{ form.is_company }} <label style="margin:0; cursor:pointer;" for="id_is_company">Céges Megrendelő?</label>
+                </div>
+
+                <div id="company-fields">
+                    <div class="form-group"><label>Cégnév</label>{{ form.company_name }}</div>
+                    <div class="form-group"><label>Adószám</label>{{ form.tax_number }}</div>
+                </div>
+
+                <div class="form-group"><label>Kapcsolattartó Neve</label>{{ form.contact_name }}</div>
+
+                <div class="date-grid">
+                    <div class="form-group"><label>Telefon</label>{{ form.contact_phone }}</div>
+                    <div class="form-group"><label>Email</label>{{ form.contact_email }}</div>
+                </div>
+                <div class="form-group"><label>Számlázási Cím</label>{{ form.contact_address }}</div>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="section-card">
+                <h3><i class="fa-solid fa-sack-dollar"></i> Pénzügy & Beállítások</h3>
+                <div class="date-grid">
+                    <div class="form-group"><label>Költségkeret</label>{{ form.budget }}</div>
+                    <div class="form-group"><label>ÁFA Kulcs (%)</label>{{ form.vat_rate }}</div>
+                </div>
+                <div class="date-grid">
+                    <div class="form-group"><label>Rezsíóradíj</label>{{ form.hourly_rate }}</div>
+                    <div class="form-group"><label>Napi munkaóra</label>{{ form.hours_per_day }}</div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h3><i class="fa-regular fa-calendar-days"></i> Ütemezés</h3>
+                <div class="date-grid">
+                    <div class="form-group"><label>Beérkezés</label>{{ form.inquiry_date }}</div>
+                    <div class="form-group"><label>Visszahívás</label>{{ form.callback_date }}</div>
+                    <div class="form-group"><label>Felmérés</label>{{ form.survey_date }}</div>
+                    <div class="form-group"><label>Ajánlattétel</label>{{ form.quote_date }}</div>
+                    <div class="form-group"><label>Szerződéskötés</label>{{ form.contract_date }}</div>
+                    <div class="form-group"><label style="color:var(--primary);">Kezdés Dátuma</label>{{ form.start_date }}</div>
+                    <div class="form-group"><label>Műszaki Átadás</label>{{ form.handover_date }}</div>
+                    <div class="form-group"><label>Projekt Zárása</label>{{ form.end_date }}</div>
+                </div>
+            </div>
+        </div>
     </div>
-</body>
-</html>
+
+    <div class="form-actions">
+        <a href="{% if form.instance.pk %}{% url 'project-detail' form.instance.pk %}{% else %}{% url 'project-list' %}{% endif %}" class="btn btn-secondary">Mégse</a>
+        <button type="submit" class="btn btn-success"><i class="fa-solid fa-check"></i> Mentés</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkbox = document.getElementById('id_is_company');
+        const companyFields = document.getElementById('company-fields');
+
+        function toggleFields() {
+            if (checkbox.checked) {
+                companyFields.classList.add('visible');
+            } else {
+                companyFields.classList.remove('visible');
+            }
+        }
+
+        // Inicializálás és eseményfigyelő
+        toggleFields();
+        checkbox.addEventListener('change', toggleFields);
+    });
+</script>
+{% endblock %}

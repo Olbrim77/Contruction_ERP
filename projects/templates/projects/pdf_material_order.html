@@ -1,0 +1,79 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @font-face { font-family: 'DejaVuSans'; src: url('{{ font_path }}'); }
+        body { font-family: 'DejaVuSans', sans-serif; font-size: 11px; color: #333; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+        .title { font-size: 18px; font-weight: bold; text-align: right; }
+        .meta-table { width: 100%; margin-bottom: 30px; }
+        .meta-table td { vertical-align: top; width: 50%; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background-color: #eee; border-bottom: 1px solid #ccc; padding: 5px; text-align: left; font-weight: bold; }
+        td { border-bottom: 1px solid #eee; padding: 5px; }
+        .numeric { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">MEGRENDELÉS #{{ order.id }}</div>
+        <div>Dátum: {{ order.date|date:"Y.m.d" }}</div>
+    </div>
+
+    <table class="meta-table">
+        <tr>
+            <td>
+                <strong>Megrendelő:</strong><br>
+                {{ company_name }}<br>
+                {{ company_address }}<br>
+                Tel: {{ company_phone }}
+            </td>
+            <td>
+                <strong>Beszállító:</strong><br>
+                {% if order.supplier %}
+                    {{ order.supplier.name }}<br>
+                    {% if order.supplier.contact_person %}
+                        {{ order.supplier.contact_person }}<br>
+                    {% endif %}
+                    {% if order.supplier.email %}
+                        {{ order.supplier.email }}
+                    {% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <h3>Megrendelt Tételek</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Megnevezés</th>
+                <th>Mennyiség</th>
+                <th>Egység</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.quantity|floatformat:2 }}</td>
+                <td>{{ item.unit }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;">
+        <strong>Megjegyzés:</strong><br>
+        {{ order.notes|default:"-"|linebreaksbr }}
+    </div>
+
+    <div style="margin-top: 50px; text-align: right;">
+        _________________________<br>Aláírás
+    </div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="form-card" style="max-width: 900px; margin: 0 auto;">
+    <h2>📦 Rendelés Költségvetésből</h2>
+    <p>Válaszd ki azokat a tételeket, amelyeket meg szeretnél rendelni!</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <table class="excel-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;"><input type="checkbox" onclick="toggleAll(this)"></th>
+                    <th>Megnevezés</th>
+                    <th>Mennyiség</th>
+                    <th>Anyagár (Terv)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tasks %}
+                <tr>
+                    <td style="text-align:center;"><input type="checkbox" name="selected_items" value="{{ t.id }}"></td>
+                    <td>{{ t.leiras }}</td>
+                    <td>{{ t.mennyiseg }} {{ t.egyseg }}</td>
+                    <td>{{ t.anyag_egysegar|floatformat:0|intcomma }} Ft</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="text-align:center; padding:20px;">Nincs anyagköltség a költségvetésben.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top:20px; text-align:right;">
+            <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Mégse</a>
+            <button type="submit" class="btn btn-primary">Rendelés Generálása »</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function toggleAll(source) {
+        checkboxes = document.getElementsByName('selected_items');
+        for(var i=0, n=checkboxes.length;i<n;i++) { checkboxes[i].checked = source.checked; }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="form-card" style="max-width: 500px; margin: 50px auto; text-align: center;">
+    <h2 style="color:#28a745;">💰 Számla Érkeztetése</h2>
+    <p>Biztosan lezárod ezt a rendelést?</p>
+
+    <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin:20px 0;">
+        <h3>{{ order.supplier }}</h3>
+        <p>Rendelés azonosító: <strong>#{{ order.id }}</strong></p>
+    </div>
+
+    <p>A rendszer automatikusan létrehoz egy <strong>Kiadást</strong> a projekthez, és a rendelést "Teljesítve" státuszba állítja.</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success" style="width:100%; padding:15px; font-size:1.1em;">Igen, Könyvelés és Lezárás</button>
+    </form>
+
+    <a href="{% url 'project-detail' order.project.id %}" style="display:block; margin-top:15px; color:#666;">Mégse</a>
+</div>
+{% endblock %}
