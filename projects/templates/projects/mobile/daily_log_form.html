@@ -1,0 +1,44 @@
+{% extends 'projects/base.html' %}
+{% block title %}Napló Írása{% endblock %}
+{% block extra_css %}
+<style>
+    label { display: block; font-weight: bold; margin-bottom: 5px; margin-top: 15px; color: #444; font-size: 14px; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    .save-btn { width: 100%; padding: 18px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 30px; cursor: pointer; }
+    .inventory-table { width: 100%; margin-top: 10px; border-collapse: collapse; background: #fff; }
+    .inventory-table td { padding: 10px 5px; border-bottom: 1px solid #eee; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <a href="{% url 'mobile-project-detail' project.id %}" style="color:#666; text-decoration:none;">&laquo; Mégse</a>
+    <h2 style="margin-top:10px; color:#005a9c;">📋 Napi Jelentés</h2>
+    <form method="POST">
+        {% csrf_token %}
+        <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #e1e4e8;">
+            <label>Dátum</label>{{ form.date }}
+            <div style="display: flex; gap: 15px;">
+                <div style="flex:1;"><label>Időjárás</label>{{ form.weather }}</div>
+                <div style="flex:1;"><label>Létszám (fő)</label>{{ form.workforce }}</div>
+            </div>
+            <label>Elvégzett Munka</label>{{ form.work_done }}
+            <label>Problémák</label>{{ form.problems }}
+        </div>
+
+        <h3 style="margin-top:30px;">🏗️ Anyagfelhasználás</h3>
+        <div style="background:#fff; padding:10px; border-radius:8px; border:1px solid #e1e4e8;">
+            {{ formset.management_form }}
+            <table class="inventory-table">
+                {% for f in formset %}
+                <tr>
+                    <td>{{ f.inventory_item }}</td>
+                    <td width="80px">{{ f.quantity }}</td>
+                    <td width="30px" style="text-align:center;">{{ f.DELETE }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <button type="submit" class="save-btn">MENTÉS ✅</button>
+    </form>
+</div>
+{% endblock %}

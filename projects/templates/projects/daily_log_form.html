@@ -8,47 +8,40 @@
 
 {% block extra_css %}
 <style>
-    .form-card { background: #fff; padding: 40px; border-radius: 12px; border: 1px solid var(--border); max-width: 700px; margin: 0 auto; }
-    h2 { color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 25px; }
-    label { font-weight: bold; color: #444; display: block; margin-bottom: 5px; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; margin-bottom: 15px; }
-    .row { display: flex; gap: 20px; }
-    .col { flex: 1; }
+    .form-card { background: #fff; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; }
+    label { display: block; font-weight: bold; margin-bottom: 5px; margin-top: 15px; color: #444; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+    .save-btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 18px; margin-top: 30px; cursor: pointer; }
+    .inventory-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+    .inventory-table td { padding: 10px 0; border-bottom: 1px solid #eee; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="form-card">
-    <h2>📋 Napi Jelentés Rögzítése</h2>
-
+    <h2 style="margin-top:0;">📋 Napi Jelentés</h2>
     <form method="POST">
         {% csrf_token %}
+        <label>Dátum</label>{{ form.date }}
+        <label>Időjárás</label>{{ form.weather }}
+        <label>Létszám (fő)</label>{{ form.workforce }}
+        <label>Elvégzett munka</label>{{ form.work_done }}
+        <label>Problémák</label>{{ form.problems }}
 
-        <div class="row">
-            <div class="col">
-                <label>Dátum</label>
-                {{ form.date }}
-            </div>
-            <div class="col">
-                <label>Időjárás</label>
-                {{ form.weather }}
-            </div>
-            <div class="col">
-                <label>Létszám (fő)</label>
-                {{ form.workforce }}
-            </div>
-        </div>
-
-        <label>Elvégzett munka leírása</label>
-        {{ form.work_done }}
-
-        <label>Felmerült problémák / Megjegyzés</label>
-        {{ form.problems }}
-
-        <div style="text-align: right; margin-top: 20px;">
-            <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Mégse</a>
-            <button type="submit" class="btn btn-primary">Mentés</button>
-        </div>
+        <hr style="margin: 30px 0;">
+        <h3 style="font-size:16px;">Anyagfelhasználás (Raktárból)</h3>
+        {{ formset.management_form }}
+        <table class="inventory-table">
+            {% for f in formset %}
+            <tr>
+                <td>{{ f.inventory_item }}</td>
+                <td width="80px">{{ f.quantity }}</td>
+                <td width="30px">{{ f.DELETE }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <button type="submit" class="save-btn">Mentés</button>
+        <a href="{% url 'project-detail' project.id %}" style="display:block; text-align:center; margin-top:20px;">Mégse</a>
     </form>
 </div>
 {% endblock %}

@@ -1,16 +1,10 @@
 # .gitignore
-
-# Virtuális környezet (Python)
+.venv/
 venv/
-*.pyc
 __pycache__/
-
-# Django specifikus
-*.log
-db.sqlite3
-
-# Feltöltött fájlok (Excel import, stb.)
-media/
-
-# IDE specifikus (PyCharm)
+*.pyc
 .idea/
+db.sqlite3
+media/
+*.log
+.DS_Store

@@ -1,0 +1,17 @@
+{% extends 'projects/base.html' %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <a href="{% url 'mobile-dashboard' %}" style="display:inline-block; margin-bottom:20px; color:#666; text-decoration:none;">&laquo; Vissza</a>
+    <h2 style="margin-top:0; color:#005a9c;">{{ project.name }}</h2>
+    <p style="color:#666; margin-bottom:30px;">📍 {{ project.location }}</p>
+
+    <a href="{% url 'mobile-daily-log' project.id %}" style="display:block; background: #005a9c; color: white; padding: 25px; border-radius: 12px; text-decoration: none; text-align: center; font-size: 18px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin-bottom: 20px;">
+        {% if todays_log %}📝 Mai Napló Szerkesztése{% else %}➕ Új Napi Jelentés{% endif %}
+    </a>
+
+    <a href="{% url 'project-detail' project.id %}" style="display:block; background: #fff; color: #333; padding: 15px; border-radius: 10px; text-decoration: none; text-align: center; border: 1px solid #ddd;">
+        🖥️ Teljes Asztali Nézet
+    </a>
+</div>
+{% endblock %}

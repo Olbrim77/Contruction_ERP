@@ -1,0 +1,17 @@
+{% extends 'projects/base.html' %}
+{% block title %}Mobil Napló{% endblock %}
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <h2 style="text-align:center; color:#005a9c; margin-bottom:20px;">📱 TerepNapló</h2>
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+        {% for p in projects %}
+        <a href="{% url 'mobile-project-detail' p.id %}" style="display: block; background: #fff; padding: 20px; border-radius: 10px; text-decoration: none; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-left: 6px solid #005a9c;">
+            <div style="font-size: 18px; font-weight: bold;">{{ p.name }}</div>
+            <div style="font-size: 14px; color: #666; margin-top: 5px;">📍 {{ p.location }}</div>
+        </a>
+        {% empty %}
+        <div style="text-align:center; padding: 20px;">Nincs aktív projekt.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

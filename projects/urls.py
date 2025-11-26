@@ -1,8 +1,10 @@
 # projects/urls.py
 from django.urls import path
 from . import views
+from . import views_mobile  # <-- ÚJ IMPORT!
 
 urlpatterns = [
+    # --- ASZTALI NÉZETEK (VÁLTOZATLAN) ---
     path('', views.project_list, name='project-list'),
     path('project/new/', views.project_create, name='project-create'),
     path('project/<int:pk>/edit/', views.project_update, name='project-update'),
@@ -45,7 +47,6 @@ urlpatterns = [
     path('project/<int:project_id>/document/new/', views.document_create, name='document-create'),
     path('document/<int:pk>/delete/', views.document_delete, name='document-delete'),
 
-    # === ANYAGRENDELÉS ===
     path('project/<int:project_id>/order/new/', views.material_order_create, name='material-order-create'),
     path('project/<int:project_id>/order/from-budget/', views.material_order_create_from_budget,
          name='material-order-from-budget'),
@@ -53,4 +54,9 @@ urlpatterns = [
     path('order/<int:pk>/delete/', views.material_order_delete, name='material-order-delete'),
     path('order/<int:pk>/print/', views.material_order_print, name='material-order-print'),
     path('order/<int:pk>/finalize/', views.material_order_finalize, name='material-order-finalize'),
+
+    # === MOBIL NÉZETEK (TEREPNAPLÓ) ===
+    path('mobile/', views_mobile.mobile_dashboard, name='mobile-dashboard'),
+    path('mobile/project/<int:pk>/', views_mobile.mobile_project_detail, name='mobile-project-detail'),
+    path('mobile/project/<int:project_id>/log/', views_mobile.mobile_daily_log, name='mobile-daily-log'),
 ]

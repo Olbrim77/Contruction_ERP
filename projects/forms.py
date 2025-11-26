@@ -1,7 +1,9 @@
 # projects/forms.py
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog, Supplier, Material, MasterItem, ItemComponent, ProjectDocument, MaterialOrder, OrderItem
+from .models import Project, Tetelsor, Expense, DailyLog, MasterItem, ItemComponent, ProjectDocument, MaterialOrder, \
+    OrderItem, ProjectInventory, DailyMaterialUsage, Material, Munkanem, Alvallalkozo
+
 
 class ProjectForm(forms.ModelForm):
     class Meta:
@@ -25,29 +27,35 @@ class ProjectForm(forms.ModelForm):
             'end_date': forms.DateInput(attrs={'type': 'date'})
         }
 
+
 class TetelsorQuantityForm(forms.ModelForm):
     class Meta:
         model = Tetelsor
         fields = ['mennyiseg']
         widgets = {'mennyiseg': forms.NumberInput(attrs={'step': '0.01'})}
 
+
 class TetelsorEditForm(forms.ModelForm):
     material = forms.ModelChoiceField(queryset=Material.objects.all(), required=False, label="Központi Anyag (F)")
     munkanem = forms.ModelChoiceField(queryset=Munkanem.objects.all(), required=False, label="Munkanem (M)")
     alvallalkozo = forms.ModelChoiceField(queryset=Alvallalkozo.objects.all(), required=False, label="Alvállalkozó (O)")
+
     class Meta:
         model = Tetelsor
-        fields = ['mennyiseg', 'leiras', 'egyseg', 'normaido', 'anyag_egysegar', 'material', 'alvallalkozo', 'munkanem', 'megjegyzes', 'engy_kod', 'k_jelzo', 'cpr_kod', 'progress_percentage', 'labor_split_percentage']
+        fields = ['mennyiseg', 'leiras', 'egyseg', 'normaido', 'anyag_egysegar', 'material', 'alvallalkozo', 'munkanem',
+                  'megjegyzes', 'engy_kod', 'k_jelzo', 'cpr_kod', 'progress_percentage', 'labor_split_percentage']
         widgets = {
             'megjegyzes': forms.Textarea(attrs={'rows': 3}),
             'leiras': forms.Textarea(attrs={'rows': 3})
         }
+
 
 class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
         fields = ['name', 'date', 'category', 'amount_netto', 'invoice_file']
         widgets = {'date': forms.DateInput(attrs={'type': 'date'})}
+
 
 class DailyLogForm(forms.ModelForm):
     class Meta:
@@ -59,9 +67,11 @@ class DailyLogForm(forms.ModelForm):
             'problems': forms.Textarea(attrs={'rows': 3})
         }
 
+
 class TetelsorCreateFromMasterForm(forms.Form):
     master_item = forms.ModelChoiceField(queryset=MasterItem.objects.all(), label="Válassz tételt a Törzsből")
     mennyiseg = forms.DecimalField(label="Mennyiség", decimal_places=2)
+
 
 class MasterItemForm(forms.ModelForm):
     class Meta:
@@ -69,11 +79,13 @@ class MasterItemForm(forms.ModelForm):
         fields = '__all__'
         widgets = {'leiras': forms.Textarea(attrs={'rows': 3})}
 
+
 class ItemComponentForm(forms.ModelForm):
     class Meta:
         model = ItemComponent
         fields = ['material', 'amount']
         widgets = {'amount': forms.NumberInput(attrs={'step': '0.01'})}
+
 
 class ProjectDocumentForm(forms.ModelForm):
     class Meta:
@@ -85,6 +97,7 @@ class ProjectDocumentForm(forms.ModelForm):
             'description': 'Rövid leírás / Megnevezés (Opcionális)'
         }
 
+
 class MaterialOrderForm(forms.ModelForm):
     class Meta:
         model = MaterialOrder
@@ -94,9 +107,31 @@ class MaterialOrderForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
 
+
 OrderItemFormSet = inlineformset_factory(
     MaterialOrder, OrderItem,
     fields=['name', 'quantity', 'unit', 'price'],
+    extra=1,
+    can_delete=True
+)
+
+
+class DailyMaterialUsageForm(forms.ModelForm):
+    class Meta:
+        model = DailyMaterialUsage
+        fields = ['inventory_item', 'quantity']
+
+    def __init__(self, *args, **kwargs):
+        project = kwargs.pop('project', None)
+        super().__init__(*args, **kwargs)
+        if project:
+            self.fields['inventory_item'].queryset = ProjectInventory.objects.filter(project=project)
+
+
+DailyMaterialUsageFormSet = inlineformset_factory(
+    DailyLog, DailyMaterialUsage,
+    form=DailyMaterialUsageForm,
+    fields=['inventory_item', 'quantity'],
     extra=1,
     can_delete=True
 )
