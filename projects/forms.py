@@ -1,8 +1,18 @@
 # projects/forms.py
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Project, Tetelsor, Expense, DailyLog, MasterItem, ItemComponent, ProjectDocument, MaterialOrder, \
-    OrderItem, ProjectInventory, DailyMaterialUsage, Material, Munkanem, Alvallalkozo
+from .models import (
+    Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
+    Supplier, Material, MasterItem, ItemComponent, ProjectDocument,
+    MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage
+)
+
+
+# --- DÁTUM MEZŐ JAVÍTÁSA IOS-HEZ ---
+class DateInput(forms.DateInput):
+    input_type = 'date'
+    # Ez a formátum kell, hogy az iPhone felismerje az értéket:
+    format = '%Y-%m-%d'
 
 
 class ProjectForm(forms.ModelForm):
@@ -16,23 +26,29 @@ class ProjectForm(forms.ModelForm):
             'start_date', 'handover_date', 'end_date',
             'budget', 'hourly_rate', 'vat_rate', 'hours_per_day'
         ]
+        # Itt használjuk a saját DateInput osztályunkat
         widgets = {
-            'inquiry_date': forms.DateInput(attrs={'type': 'date'}),
-            'callback_date': forms.DateInput(attrs={'type': 'date'}),
-            'survey_date': forms.DateInput(attrs={'type': 'date'}),
-            'quote_date': forms.DateInput(attrs={'type': 'date'}),
-            'contract_date': forms.DateInput(attrs={'type': 'date'}),
-            'start_date': forms.DateInput(attrs={'type': 'date'}),
-            'handover_date': forms.DateInput(attrs={'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'type': 'date'})
+            'inquiry_date': DateInput(),
+            'callback_date': DateInput(),
+            'survey_date': DateInput(),
+            'quote_date': DateInput(),
+            'contract_date': DateInput(),
+            'start_date': DateInput(),
+            'handover_date': DateInput(),
+            'end_date': DateInput()
         }
 
 
-class TetelsorQuantityForm(forms.ModelForm):
+class TaskForm(forms.ModelForm):
     class Meta:
-        model = Tetelsor
-        fields = ['mennyiseg']
-        widgets = {'mennyiseg': forms.NumberInput(attrs={'step': '0.01'})}
+        model = Task
+        fields = ['project', 'name', 'due_date']
+        widgets = {'due_date': DateInput()}  # JAVÍTVA
+
+
+class TetelsorQuantityForm(forms.ModelForm):
+    class Meta: model = Tetelsor; fields = ['mennyiseg']; widgets = {
+        'mennyiseg': forms.NumberInput(attrs={'step': '0.01'})}
 
 
 class TetelsorEditForm(forms.ModelForm):
@@ -44,17 +60,13 @@ class TetelsorEditForm(forms.ModelForm):
         model = Tetelsor
         fields = ['mennyiseg', 'leiras', 'egyseg', 'normaido', 'anyag_egysegar', 'material', 'alvallalkozo', 'munkanem',
                   'megjegyzes', 'engy_kod', 'k_jelzo', 'cpr_kod', 'progress_percentage', 'labor_split_percentage']
-        widgets = {
-            'megjegyzes': forms.Textarea(attrs={'rows': 3}),
-            'leiras': forms.Textarea(attrs={'rows': 3})
-        }
+        widgets = {'megjegyzes': forms.Textarea(attrs={'rows': 3}), 'leiras': forms.Textarea(attrs={'rows': 3})}
 
 
 class ExpenseForm(forms.ModelForm):
-    class Meta:
-        model = Expense
-        fields = ['name', 'date', 'category', 'amount_netto', 'invoice_file']
-        widgets = {'date': forms.DateInput(attrs={'type': 'date'})}
+    class Meta: model = Expense; fields = ['name', 'date', 'category', 'amount_netto', 'invoice_file'];
+
+    widgets = {'date': DateInput()}  # JAVÍTVA
 
 
 class DailyLogForm(forms.ModelForm):
@@ -62,7 +74,7 @@ class DailyLogForm(forms.ModelForm):
         model = DailyLog
         fields = ['date', 'weather', 'workforce', 'work_done', 'problems']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'date': DateInput(),  # JAVÍTVA (Ez a legfontosabb a mobil naplóhoz!)
             'work_done': forms.Textarea(attrs={'rows': 5}),
             'problems': forms.Textarea(attrs={'rows': 3})
         }
@@ -74,17 +86,12 @@ class TetelsorCreateFromMasterForm(forms.Form):
 
 
 class MasterItemForm(forms.ModelForm):
-    class Meta:
-        model = MasterItem
-        fields = '__all__'
-        widgets = {'leiras': forms.Textarea(attrs={'rows': 3})}
+    class Meta: model = MasterItem; fields = '__all__'; widgets = {'leiras': forms.Textarea(attrs={'rows': 3})}
 
 
 class ItemComponentForm(forms.ModelForm):
-    class Meta:
-        model = ItemComponent
-        fields = ['material', 'amount']
-        widgets = {'amount': forms.NumberInput(attrs={'step': '0.01'})}
+    class Meta: model = ItemComponent; fields = ['material', 'amount']; widgets = {
+        'amount': forms.NumberInput(attrs={'step': '0.01'})}
 
 
 class ProjectDocumentForm(forms.ModelForm):
@@ -103,7 +110,7 @@ class MaterialOrderForm(forms.ModelForm):
         model = MaterialOrder
         fields = ['supplier', 'date', 'status', 'notes']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'date': DateInput(),  # JAVÍTVA
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
 
@@ -114,6 +121,15 @@ OrderItemFormSet = inlineformset_factory(
     extra=1,
     can_delete=True
 )
+
+
+# FOTÓZÁSHOZ (Ez jó volt, de hagyjuk meg)
+class MobilePhotoForm(forms.Form):
+    image = forms.ImageField(
+        label="📷 Fotó készítése",
+        required=False,
+        widget=forms.ClearableFileInput(attrs={'capture': 'environment', 'accept': 'image/*', 'class': 'photo-input'})
+    )
 
 
 class DailyMaterialUsageForm(forms.ModelForm):

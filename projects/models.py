@@ -2,9 +2,10 @@
 from django.db import models
 from decimal import Decimal
 from django.utils import timezone
+import math
 
 
-# --- PROJEKT ---
+# --- PROJEKT MODELL ---
 class Project(models.Model):
     STATUS_CHOICES = [
         ('UJ_KERES', '1. Új Megkeresés (Lead)'), ('FELMERES', '2. Felmérés alatt'), ('AJANLAT', '3. Ajánlattétel'),
@@ -15,7 +16,6 @@ class Project(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='UJ_KERES', verbose_name="Státusz")
     location = models.CharField(max_length=255, verbose_name="Helyszín")
 
-    # CRM / Kapcsolattartó
     contact_name = models.CharField(max_length=150, verbose_name="Megrendelő Neve", blank=True)
     contact_phone = models.CharField(max_length=50, blank=True);
     contact_email = models.EmailField(blank=True)
@@ -25,7 +25,6 @@ class Project(models.Model):
     company_name = models.CharField(max_length=200, blank=True);
     tax_number = models.CharField(max_length=50, blank=True)
 
-    # Dátumok
     inquiry_date = models.DateField(null=True, blank=True);
     callback_date = models.DateField(null=True, blank=True)
     survey_date = models.DateField(null=True, blank=True);
@@ -35,7 +34,6 @@ class Project(models.Model):
     handover_date = models.DateField(null=True, blank=True);
     end_date = models.DateField(null=True, blank=True)
 
-    # Pénzügy
     budget = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=5000)
     vat_rate = models.DecimalField(max_digits=5, decimal_places=2, default=27.00)
@@ -100,7 +98,7 @@ class ItemComponent(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
 
-# --- TÉTELSOR ---
+# --- TÉTELSOR (OKOS MENTÉSSEL) ---
 class Tetelsor(models.Model):
     project = models.ForeignKey(Project, related_name='tetelsorok', on_delete=models.CASCADE)
     master_item = models.ForeignKey(MasterItem, on_delete=models.PROTECT)
@@ -126,7 +124,13 @@ class Tetelsor(models.Model):
     sajat_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0);
     alv_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
+    # GANTT MEZŐK
+    gantt_start_date = models.DateField(null=True, blank=True, verbose_name="Tervezett Kezdés")
+    gantt_duration = models.IntegerField(default=1, verbose_name="Időtartam (nap)")
+    felelos = models.CharField(max_length=100, blank=True, verbose_name="Felelős")
+
     def save(self, *args, **kwargs):
+        # 1. Adatok másolása a törzsből (csak létrehozáskor)
         if self.master_item and not self.leiras:
             self.leiras = self.master_item.leiras;
             self.egyseg = self.master_item.egyseg;
@@ -138,6 +142,7 @@ class Tetelsor(models.Model):
             if not self.anyag_egysegar: self.anyag_egysegar = self.master_item.calculated_material_cost
         if self.material and self.material.price is not None: self.anyag_egysegar = self.material.price
 
+        # 2. Pénzügyi számítások
         rate = Decimal(str(self.project.hourly_rate or 0));
         norma = Decimal(str(self.normaido or 0));
         mennyiseg = Decimal(str(self.mennyiseg or 0))
@@ -149,18 +154,35 @@ class Tetelsor(models.Model):
         self.dij_egysegre_alv = full_labor * (Decimal(1) - split)
         self.sajat_munkadij_osszesen = mennyiseg * self.dij_egysegre_sajat;
         self.alv_munkadij_osszesen = mennyiseg * self.dij_egysegre_alv
+
+        # 3. GANTT IDŐTARTAM SZÁMÍTÁS (Ha még nincs kézi érték)
+        # Ha az időtartam 1 (alapérték), akkor kiszámoljuk a valósat
+        if (not self.gantt_duration or self.gantt_duration <= 1) and norma > 0 and mennyiseg > 0:
+            hpd = float(self.project.hours_per_day or 8)
+            total_hours = float(mennyiseg * norma)
+            if hpd > 0:
+                self.gantt_duration = math.ceil(total_hours / hpd)
+            if self.gantt_duration < 1: self.gantt_duration = 1
+
         super().save(*args, **kwargs)
 
     @property
     def tetelszam(self):
         return self.master_item.tetelszam
 
+    def __str__(self):
+        return f"{self.master_item.tetelszam}"
 
+
+# --- EGYÉB MODELLEK ---
 class Task(models.Model):
+    STATUS_CHOICES = [('FUGGO', 'Függőben'), ('KESZ', 'Kész')]
     project = models.ForeignKey(Project, on_delete=models.CASCADE);
     name = models.CharField(max_length=200);
-    status = models.CharField(max_length=20, default='FUGGO');
-    due_date = models.DateField(null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='FUGGO');
+    due_date = models.DateField(null=True, blank=True)
+
+    class Meta: ordering = ['due_date']
 
 
 class Expense(models.Model):
@@ -187,7 +209,6 @@ class DailyLog(models.Model):
     class Meta: ordering = ['-date']; unique_together = ('project', 'date')
 
 
-# === EZEK HIÁNYOZTAK ===
 class CompanySettings(models.Model):
     name = models.CharField(max_length=200, default="Saját Kft.");
     tax_number = models.CharField(max_length=50, blank=True)
@@ -204,8 +225,6 @@ class CompanySettings(models.Model):
 
     def full_address(
             self): return f"{self.head_zip_code} {self.head_city}, {self.head_street} {self.head_house_number}."
-
-    class Meta: verbose_name = "Cégbeállítások"; verbose_name_plural = "Cégbeállítások"
 
 
 class CompanySite(models.Model):
@@ -270,3 +289,9 @@ class DailyMaterialUsage(models.Model):
     log = models.ForeignKey(DailyLog, related_name='material_usages', on_delete=models.CASCADE)
     inventory_item = models.ForeignKey(ProjectInventory, on_delete=models.CASCADE);
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
+
+
+class GanttLink(models.Model):
+    source = models.ForeignKey(Tetelsor, related_name='source_links', on_delete=models.CASCADE)
+    target = models.ForeignKey(Tetelsor, related_name='target_links', on_delete=models.CASCADE)
+    type = models.CharField(max_length=2, default='0')

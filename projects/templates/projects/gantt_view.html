@@ -1,113 +1,153 @@
-
 <!DOCTYPE html>
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>Gantt Diagram - {{ project.name }}</title>
-    <link rel="stylesheet" href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css">
+    <title>Gantt Diagram</title>
+
+    <script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
+    <link href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css" rel="stylesheet">
+    <script src="https://cdn.dhtmlx.com/gantt/edge/ext/dhtmlxgantt_marker.js"></script>
 
     <style>
-        html, body {
-            height: 100%;
-            padding: 0;
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        #gantt_here {
-            width: 100%;
-            height: 100%;
-        }
-        .gantt-controls {
-            background-color: #f4f4f4;
-            padding: 10px;
-            border-bottom: 1px solid #ccc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .back-btn {
-            background-color: #005a9c;
-            color: white;
-            padding: 8px 15px;
-            text-decoration: none;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-        .back-btn:hover {
-            background-color: #004a80;
-        }
-        h2 { margin: 0; font-size: 1.2em; color: #333; }
+        html, body { height: 100%; padding: 0; margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #gantt_here { width: 100%; height: 100%; }
 
-        /* === ÚJ STÍLUSOK A ZÖLD KÉSZÜLTSÉGHEZ === */
-
-        /* 1. A Feladat alapcsíkja (Legyen szürke, hogy a zöld jól látszódjon) */
-        .gantt_task_line {
-            background-color: #6c757d;
-            border: 1px solid #5a6268;
+        .gantt-header {
+            padding: 10px 20px; background: #f4f4f4; border-bottom: 1px solid #ccc;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
+        .btn {
+            padding: 8px 15px; background: #005a9c; color: white;
+            text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;
+            border: none; cursor: pointer; transition: background 0.2s;
+        }
+        .btn:hover { background: #004a80; }
 
-        /* 2. A Készültség (Progress) csíkja -> ZÖLD */
+        /* --- GANTT STÍLUSOK --- */
+
+        /* 1. PROCESS (HALADÁS) SZÍNE */
+        /* Ez a sötétebb csík a feladaton belül, ami mutatja, hány % van kész */
         .gantt_task_progress {
-            background-color: #28a745; /* Élénk zöld */
-            border: 1px solid #1e7e34;
-            opacity: 0.8;
+            background-color: #e67e22; /* <-- ITT ÁLLÍTSD A SZÍNT (pl. kék) */
+            opacity: 0.6; /* Átlátszóság */
         }
 
-        /* Szöveg színe a csíkon belül */
-        .gantt_task_content {
-            color: #fff;
-            font-weight: bold;
+        /* A feladat alap (háttér) színe */
+        .gantt_task_line {
+            background-color: #65c16f; /* Alap zöldes árnyalat */
+            border: 1px solid #3c9445;
         }
 
+        /* Külön stílus a 100%-ban kész feladatoknak (Zöld) */
+        .completed_task { border: 1px solid #28a745; background: #28a745; }
+        .completed_task .gantt_task_progress { background: #155724; } /* Sötétzöld csík */
+
+        /* Hétvége színezése */
+        .weekend { background: #f4f7f4 !important; }
+
+        /* Mai nap jelölő */
+        .today_marker { background: rgba(255, 0, 0, 0.4); }
+
+        /* Fejléc stílusok */
+        .gantt_scale_line { border-bottom: 1px solid #cecece; }
+        .gantt_grid_scale .gantt_grid_head_cell { font-weight: bold; color: #333; font-size: 13px; }
+        .gantt_scale_cell.weekend_scale { background-color: #f4f7f4; color: #d9534f; }
     </style>
 </head>
 <body>
 
-    <div class="gantt-controls">
-        <h2>{{ project.name }} - Ütemezés</h2>
-        <a href="{% url 'project-detail' project.id %}" class="back-btn">&laquo; Vissza a Projekthez</a>
+<div class="gantt-header">
+    <div>
+        <strong style="font-size: 18px; color: #333;">{{ project.name }}</strong>
+        <span style="font-size: 0.9em; color: #666; margin-left: 20px;">
+            <i class="fa fa-calendar"></i> Részletes nézet
+        </span>
     </div>
+    <div>
+        <button onclick="gantt.exportToPDF()" class="btn" style="background:#d9534f;">PDF Export</button>
+        <a href="{% url 'project-detail' project.id %}" class="btn">Vissza az Adatlapra</a>
+    </div>
+</div>
 
-    <div id="gantt_here"></div>
+<div id="gantt_here"></div>
 
-    <script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
+<script>
+    // ADATOK
+    var alvallalkozok = [
+        { key: "", label: "-" },
+        {% for a in alvallalkozok %}
+            { key: "{{ a.id }}", label: "{{ a.nev }}" },
+        {% endfor %}
+    ];
 
-    <script>
-        // Dátum formátum beállítása
-        gantt.config.date_format = "%Y-%m-%d";
-        gantt.config.xml_date = "%Y-%m-%d";
+    // --- 2. KONFIGURÁCIÓ (MÉRETEK) ---
 
-        // Oszlopok konfigurálása
-        gantt.config.columns = [
-            {name:"text", label:"Feladat neve", width:"*", tree:true },
-            {name:"start_date", label:"Kezdés", align:"center", width:90 },
-            {name:"duration", label:"Napok", align:"center", width:60 },
-            {name:"mennyiseg", label:"Mennyiség", align:"center", width:80 },
-            // Progress oszlop megjelenítése százalékosan
-            {name:"progress", label:"Kész (%)", align:"center", template: function(obj) {
-                return Math.round(obj.progress * 100) + "%";
-            }, width:60 }
-        ];
+    // Itt állíthatod a sávok vastagságát!
+    gantt.config.row_height = 40;  // Egy sor teljes magassága (pixelben)
+    gantt.config.bar_height = 18;  // Maga a színes csík vastagsága (legyen kisebb, mint a row_height)
 
-        // Skála beállítása (Magyar)
-        gantt.i18n.setLocale("hu");
+    gantt.plugins({ marker: true });
+    gantt.i18n.setLocale("hu");
+    gantt.config.date_format = "%Y-%m-%d";
+    gantt.config.xml_date = "%Y-%m-%d";
 
-        // Időskála
-        gantt.config.scale_unit = "month";
-        gantt.config.date_scale = "%F, %Y";
-        gantt.config.subscales = [
-            {unit:"day", step:1, date:"%j" }
-        ];
+    // Oszlopok
+    gantt.config.columns = [
+        {name: "text", label: "Feladat", width: 200, tree: true, resize: true},
+        {name: "start_date", label: "Kezdés", align: "center", width: 80},
+        {name: "finish_date", label: "Befejezés", align: "center", width: 80},
+        {name: "duration", label: "Nap", align: "center", width: 40},
+        {name: "felelos", label: "Felelős", width: 80, align: "center", editor: { type: "text", map_to: "felelos" }},
+        {name: "owner_id", label: "Alv.", width: 80, align: "center", template: function(item) {
+            var alv = alvallalkozok.find(x => x.key == item.owner_id);
+            return alv ? alv.label : "-";
+         }, editor: { type: "select", map_to: "owner_id", options: alvallalkozok }
+        },
+        {name: "add", label: "", width: 30}
+    ];
 
-        // Csak olvasás mód
-        gantt.config.readonly = true;
+    // IDŐSKÁLA
+    gantt.config.scale_height = 90;
+    gantt.config.min_column_width = 30;
 
-        // Inicializálás
-        gantt.init("gantt_here");
+    var day_names = ["V", "H", "K", "Sz", "Cs", "P", "Szo"];
 
-        // Adatok betöltése
-        gantt.load("{% url 'gantt-data' project.id %}", "json");
-    </script>
+    gantt.config.scales = [
+        {unit: "year", step: 1, format: "%Y"},
+        {unit: "month", step: 1, format: "%F"},
+        {unit: "day", step: 1, format: function(date){ return day_names[date.getDay()]; }, css: function(date){ if(date.getDay() == 0 || date.getDay() == 6) return "weekend_scale"; }},
+        {unit: "day", step: 1, format: "%j", css: function(date){ if(date.getDay() == 0 || date.getDay() == 6) return "weekend_scale"; }}
+    ];
+
+    // STÍLUSOK
+    gantt.templates.timeline_cell_class = function(task, date){
+        if(date.getDay() == 0 || date.getDay() == 6) return "weekend";
+    };
+
+    var today = new Date();
+    gantt.addMarker({
+        start_date: today,
+        css: "today_marker",
+        text: "Ma",
+        title: "Mai nap: " + today.toLocaleDateString()
+    });
+
+    gantt.templates.task_class = function(start, end, task){
+        if (task.progress >= 1) return "completed_task";
+        return "";
+    };
+
+    // INDÍTÁS
+    gantt.init("gantt_here");
+    gantt.load("{% url 'gantt-data' project.id %}", "json");
+
+    // MENTÉS
+    var dp = new gantt.dataProcessor("{% url 'gantt-update' project.id %}");
+    dp.init(gantt);
+    dp.setTransactionMode("POST", false);
+</script>
+
+<script src="https://export.dhtmlx.com/gantt/api.js"></script>
 </body>
 </html>

@@ -12,7 +12,7 @@ SECRET_KEY = 'django-insecure-CHANGE-ME-IN-PRODUCTION'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -112,3 +112,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+DATE_INPUT_FORMATS = [
+    '%Y-%m-%d',       # 2025-11-26 (Ez kell az iPhone-nak!)
+    '%Y.%m.%d.',      # 2025.11.26. (Magyar szabvány)
+    '%Y.%m.%d',       # 2025.11.26
+    '%d/%m/%Y',       # 26/11/2025
+    '%Y/%m/%d',       # 2025/11/26
+]

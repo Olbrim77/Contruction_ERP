@@ -1,20 +1,33 @@
 {% extends 'projects/base.html' %}
+
 {% block title %}Napló Írása{% endblock %}
+
 {% block extra_css %}
 <style>
     label { display: block; font-weight: bold; margin-bottom: 5px; margin-top: 15px; color: #444; font-size: 14px; }
     input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-    .save-btn { width: 100%; padding: 18px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 30px; cursor: pointer; }
+
+    /* Nagy zöld mentés gomb */
+    .save-btn { width: 100%; padding: 18px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 30px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+
     .inventory-table { width: 100%; margin-top: 10px; border-collapse: collapse; background: #fff; }
-    .inventory-table td { padding: 10px 5px; border-bottom: 1px solid #eee; }
+    .inventory-table td { padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 14px; }
+    .inventory-table input, .inventory-table select { margin: 0; font-size: 14px; padding: 8px; }
+
+    /* Kamera gomb stílus */
+    .photo-section { background: #e3f2fd; border: 2px dashed #2196f3; padding: 20px; text-align: center; border-radius: 10px; margin-top: 20px; }
+    .photo-input { display: block; margin: 10px auto; width: auto; }
 </style>
 {% endblock %}
+
 {% block content %}
 <div style="max-width: 600px; margin: 0 auto;">
     <a href="{% url 'mobile-project-detail' project.id %}" style="color:#666; text-decoration:none;">&laquo; Mégse</a>
     <h2 style="margin-top:10px; color:#005a9c;">📋 Napi Jelentés</h2>
-    <form method="POST">
+
+    <form method="POST" enctype="multipart/form-data">
         {% csrf_token %}
+
         <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #e1e4e8;">
             <label>Dátum</label>{{ form.date }}
             <div style="display: flex; gap: 15px;">
@@ -23,6 +36,11 @@
             </div>
             <label>Elvégzett Munka</label>{{ form.work_done }}
             <label>Problémák</label>{{ form.problems }}
+        </div>
+
+        <div class="photo-section">
+            <label style="margin-top:0; color:#005a9c; font-size:1.2em;">📷 Fotó csatolása</label>
+            {{ photo_form.image }}
         </div>
 
         <h3 style="margin-top:30px;">🏗️ Anyagfelhasználás</h3>
@@ -37,7 +55,9 @@
                 </tr>
                 {% endfor %}
             </table>
+            <p style="font-size:0.8em; color:#666; margin-top:5px;">* Csak a raktáron lévő anyagok választhatók.</p>
         </div>
+
         <button type="submit" class="save-btn">MENTÉS ✅</button>
     </form>
 </div>

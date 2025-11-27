@@ -196,14 +196,37 @@
     </div>
 
     <div id="logs" class="tab-content">
-        <div class="action-bar"><a href="{% url 'daily-log-create' project.id %}" class="btn btn-sm btn-primary">Új Bejegyzés</a></div>
+        <div class="action-bar">
+            <a href="{% url 'daily-log-create' project.id %}" class="btn btn-sm btn-primary">📋 Új Bejegyzés</a>
+        </div>
         <table class="excel-table">
-            <thead><tr><th>Dátum</th><th>Időjárás</th><th>Munka</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Dátum</th>
+                    <th>Időjárás</th>
+                    <th>Létszám</th>
+                    <th>Munka leírása</th>
+                    <th style="width: 100px; text-align: center;">Művelet</th>
+                </tr>
+            </thead>
             <tbody>
                 {% for l in project.daily_logs.all %}
                 <tr>
-                    <td><strong>{{ l.date|date:"m.d" }}</strong></td><td>{{ l.get_weather_display }}</td><td>{{ l.work_done|truncatechars:50 }}</td>
+                    <td><strong>{{ l.date|date:"Y.m.d" }}</strong></td>
+                    <td>{{ l.get_weather_display }}</td>
+                    <td>{{ l.workforce }} fő</td>
+                    <td>{{ l.work_done|linebreaksbr|truncatechars:80 }}</td>
+                    <td style="text-align:center;">
+                        <a href="{% url 'daily-log-update' l.id %}" class="btn-icon" title="Szerkesztés" style="text-decoration:none; margin-right:5px;">
+                            ✏️
+                        </a>
+                        <a href="{% url 'daily-log-delete' l.id %}" class="btn-icon danger" title="Törlés" style="text-decoration:none;">
+                            🗑️
+                        </a>
+                    </td>
                 </tr>
+                {% empty %}
+                <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">Nincsenek naplóbejegyzések.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

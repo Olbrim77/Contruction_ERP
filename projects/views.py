@@ -1,17 +1,6 @@
 # projects/views.py
 
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import (
-    Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
-    Supplier, Material, MasterItem, ItemComponent, CompanySettings,
-    ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage
-)
-from .forms import (
-    ProjectForm, TetelsorQuantityForm, TetelsorEditForm, ExpenseForm,
-    DailyLogForm, TetelsorCreateFromMasterForm, MasterItemForm, ItemComponentForm,
-    ProjectDocumentForm, MaterialOrderForm, OrderItemFormSet, DailyMaterialUsageFormSet
-)
-
 from django.db.models import Sum, F, Q
 from decimal import Decimal
 from django.utils import timezone
@@ -24,6 +13,24 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.template.loader import get_template
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.staticfiles import finders
+
+# Modellek importálása
+from .models import (
+    Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
+    Supplier, Material, MasterItem, ItemComponent, CompanySettings,
+    ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage,
+    GanttLink
+)
+
+# Űrlapok importálása
+from .forms import (
+    ProjectForm, TetelsorQuantityForm, TetelsorEditForm, ExpenseForm,
+    DailyLogForm, TetelsorCreateFromMasterForm, MasterItemForm, ItemComponentForm,
+    ProjectDocumentForm, MaterialOrderForm, OrderItemFormSet, DailyMaterialUsageFormSet,
+    TaskForm
+)
 
 try:
     from xhtml2pdf import pisa
@@ -32,21 +39,25 @@ except ImportError:
 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from django.contrib.staticfiles import finders
 
 
 # --- SEGÉDFÜGGVÉNYEK ---
 
 def calculate_work_end_date(start_date, workdays):
     """ Munkanapok alapján számolja a befejezést (H-P). """
-    if not start_date or workdays == 0: return None
+    if not start_date or workdays <= 0: return None
     current_date = start_date
-    days_to_add = int(workdays)
-    while current_date.weekday() >= 5: current_date += timedelta(days=1)
+    days_to_add = int(workdays) - 1
+
+    while current_date.weekday() >= 5:
+        current_date += timedelta(days=1)
+
     added_days = 0
     while added_days < days_to_add:
         current_date += timedelta(days=1)
-        if current_date.weekday() < 5: added_days += 1
+        if current_date.weekday() < 5:
+            added_days += 1
+
     return current_date
 
 
@@ -131,13 +142,23 @@ def project_list(request):
             if projs.exists(): project_groups.append({'label': sl, 'projects': projs})
 
     all_budgets = Tetelsor.objects.filter(project__in=projects).aggregate(
-        mat=Sum('anyag_osszesen'),
-        ls=Sum('sajat_munkadij_osszesen'),
-        la=Sum('alv_munkadij_osszesen')
+        mat=Sum('anyag_osszesen'), ls=Sum('sajat_munkadij_osszesen'), la=Sum('alv_munkadij_osszesen')
     )
     global_plan = (all_budgets['mat'] or 0) + (all_budgets['ls'] or 0) + (all_budgets['la'] or 0)
     global_spent = Expense.objects.filter(project__in=projects).aggregate(s=Sum('amount_netto'))['s'] or 0
     global_balance = global_plan - global_spent
+
+    # Feladatok (To-Do)
+    tasks = Task.objects.filter(status='FUGGO').order_by('due_date')
+
+    if request.method == 'POST' and 'task_submit' in request.POST:
+        task_form = TaskForm(request.POST)
+        if task_form.is_valid():
+            task_form.save()
+            messages.success(request, "Feladat hozzáadva!")
+            return redirect('project-list')
+    else:
+        task_form = TaskForm()
 
     status_counts = {
         'TERVEZES': projects.filter(status__in=['UJ_KERES', 'FELMERES', 'AJANLAT', 'ELOKESZITES']).count(),
@@ -148,9 +169,18 @@ def project_list(request):
 
     context = {
         'project_groups': project_groups, 'global_plan': global_plan, 'global_spent': global_spent,
-        'global_balance': global_balance, 'status_counts': status_counts, 'search_query': q or ""
+        'global_balance': global_balance, 'status_counts': status_counts, 'search_query': q or "",
+        'tasks': tasks, 'task_form': task_form
     }
     return render(request, 'projects/project_list.html', context)
+
+
+def task_complete(request, pk):
+    task = get_object_or_404(Task, id=pk)
+    task.status = 'KESZ'
+    task.save()
+    messages.success(request, "Feladat elvégezve!")
+    return redirect('project-list')
 
 
 def project_detail(request, pk):
@@ -160,7 +190,6 @@ def project_detail(request, pk):
     documents = project.documents.all().order_by('-uploaded_at')
     orders = project.material_orders.all().order_by('-date')
 
-    # RAKTÁRKÉSZLET LEKÉRÉSE
     try:
         inventory = project.inventory.all().order_by('name')
     except AttributeError:
@@ -182,7 +211,7 @@ def project_detail(request, pk):
     spent = expenses.aggregate(s=Sum('amount_netto'))['s'] or 0
     hours = summ['hours'] or 0;
     hpd = project.hours_per_day;
-    days = math.ceil(hours / hpd) if hpd else 0
+    days = math.ceil(hours / (project.hours_per_day or 8)) if project.hours_per_day else 0
     end_date = calculate_work_end_date(project.start_date, days)
 
     context = {
@@ -215,33 +244,170 @@ def project_status_update(request, pk, status_code):
     return redirect('project-detail', pk=project.id)
 
 
+# === GANTT DIAGRAM LOGIKA ===
+
 def gantt_view(request, project_id):
-    return render(request, 'projects/gantt_view.html', {'project': get_object_or_404(Project, id=project_id)})
+    # Átadjuk az alvállalkozókat is a legördülő listához
+    project = get_object_or_404(Project, id=project_id)
+    alvallalkozok = Alvallalkozo.objects.all().values('id', 'nev')
+    return render(request, 'projects/gantt_view.html', {
+        'project': project,
+        'alvallalkozok': list(alvallalkozok)
+    })
 
 
 def gantt_data(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     tasks = project.tetelsorok.all().order_by('sorszam')
     data = []
+
     for t in tasks:
         start = project.start_date or timezone.now().date()
-        norma = t.normaido or Decimal(0);
-        mennyiseg = t.mennyiseg or Decimal(0)
-        hours_per_day = project.hours_per_day or Decimal(8)
-        total_hours = mennyiseg * norma
+
+        # --- 1. IDŐTARTAM SZÁMÍTÁS (AUTOMATIKUS) ---
+        calc_duration = 1
+        if t.normaido and t.mennyiseg:
+            try:
+                norma = float(t.normaido)
+                mennyiseg = float(t.mennyiseg)
+                hpd = float(project.hours_per_day or 8)
+                if hpd > 0 and norma > 0 and mennyiseg > 0:
+                    total_hours = mennyiseg * norma
+                    calc_duration = math.ceil(total_hours / hpd)
+            except (ValueError, TypeError):
+                pass
+
+        # --- 2. DÖNTÉS: HASZNÁLJUK-E A MENTETTET? ---
         duration = 1
-        if total_hours > 0:
-            duration = math.ceil(total_hours / hours_per_day)
-        txt = t.leiras or (t.master_item.leiras if t.master_item else "-");
-        tszam = t.master_item.tetelszam if t.master_item else "";
+
+        # Ha a tételnek van mentett kezdési dátuma (tehát már szerkesztették a Gantt-on)
+        if t.gantt_start_date:
+            # Ha a mentett időtartam > 1 (tehát kézzel átírták), akkor az nyer
+            if t.gantt_duration and t.gantt_duration > 1:
+                duration = t.gantt_duration
+            # Ha a mentett 1 (alapértelmezett), de a számított több, akkor a számított nyer (ez javítja a hibát!)
+            elif calc_duration > 1:
+                duration = calc_duration
+            else:
+                duration = 1
+        else:
+            # Ha még nem szerkesztették (nincs start date), akkor a számított
+            duration = calc_duration
+
+        if duration < 1: duration = 1
+        # --------------------------------------------
+
+        txt = t.leiras if t.leiras else (t.master_item.leiras if t.master_item else "-")
+        tszam = t.master_item.tetelszam if t.master_item else (t.sorszam if t.sorszam else "")
         mn = t.munkanem.nev if t.munkanem else "-"
+
+        # Kezdés
+        start_date_obj = t.gantt_start_date if t.gantt_start_date else start
+        start_date_str = start_date_obj.strftime("%Y-%m-%d")
+
+        # Befejezés (számított)
+        finish_date_obj = calculate_work_end_date(start_date_obj, duration)
+        finish_date_str = finish_date_obj.strftime("%Y-%m-%d") if finish_date_obj else ""
+
         data.append({
-            'id': t.id, 'text': f"{t.tetelszam}-{txt[:20]}",
-            'start_date': (project.start_date or timezone.now()).strftime("%Y-%m-%d"),
-            'duration': duration, 'progress': float(t.progress_percentage) / 100,
-            'open': True, 'mennyiseg': f"{t.mennyiseg} {t.egyseg}", 'munkanem': mn
+            'id': t.id,
+            'text': f"{tszam} - {txt[:30]}...",
+            'start_date': start_date_str,
+            'finish_date': finish_date_str,
+            'duration': duration,
+            'progress': float(t.progress_percentage) / 100 if t.progress_percentage else 0,
+            'open': True,
+            'mennyiseg': f"{t.mennyiseg} {t.egyseg}",
+            'munkanem': mn,
+            'felelos': t.felelos or "",
+            'owner_id': t.alvallalkozo.id if t.alvallalkozo else ""
         })
-    return JsonResponse({"data": data})
+
+    # Linkek
+    link_data = []
+    try:
+        links = GanttLink.objects.filter(source__project=project)
+        link_data = [{'id': l.id, 'source': l.source.id, 'target': l.target.id, 'type': l.type} for l in links]
+    except Exception:
+        pass
+
+    return JsonResponse({"data": data, "links": link_data})
+
+
+@csrf_exempt
+def gantt_update(request, project_id):
+    """ GANTT MENTÉS (OKOS PARAMÉTER-KEZELÉSSEL) """
+    if request.method == 'POST':
+        try:
+            # Paraméterek keresése POST-ban és GET-ben is
+            mode = request.POST.get("gantt_mode") or request.GET.get("gantt_mode")
+            op = request.POST.get("!nativeeditor_status")
+            sid = request.POST.get("id")
+
+            # Link detektálás
+            is_link = ('source' in request.POST and 'target' in request.POST) or (mode == 'link')
+
+            if is_link:
+                if op == "inserted":
+                    source = get_object_or_404(Tetelsor, id=request.POST.get("source"))
+                    target = get_object_or_404(Tetelsor, id=request.POST.get("target"))
+                    link = GanttLink.objects.create(source=source, target=target, type=request.POST.get("type", "0"))
+                    return JsonResponse({"action": "inserted", "tid": link.id})
+                elif op == "deleted":
+                    GanttLink.objects.filter(id=sid).delete()
+                    return JsonResponse({"action": "deleted"})
+                elif op == "updated":
+                    link = get_object_or_404(GanttLink, id=sid)
+                    link.type = request.POST.get("type", "0")
+                    link.save()
+                    return JsonResponse({"action": "updated"})
+
+            else:  # TASK
+                if op == "updated":
+                    task = get_object_or_404(Tetelsor, id=sid)
+                    if "start_date" in request.POST:
+                        task.gantt_start_date = request.POST.get("start_date")[:10]
+                    if "duration" in request.POST:
+                        task.gantt_duration = int(request.POST.get("duration"))
+                    if "progress" in request.POST:
+                        task.progress_percentage = float(request.POST.get("progress")) * 100
+
+                    # ÚJ MEZŐK MENTÉSE
+                    if "felelos" in request.POST:
+                        task.felelos = request.POST.get("felelos")
+                    if "owner_id" in request.POST:  # Alvállalkozó
+                        aid = request.POST.get("owner_id")
+                        task.alvallalkozo = Alvallalkozo.objects.get(id=aid) if aid else None
+
+                    task.save()
+                    return JsonResponse({"action": "updated"})
+
+                elif op == "inserted":
+                    return JsonResponse({"action": "error", "msg": "Új tételt a Költségvetésben vegyél fel!"})
+
+        except Exception as e:
+            print(f"GANTT HIBA: {e}")  # Debug
+            return JsonResponse({"action": "error", "msg": str(e)})
+
+    return JsonResponse({"action": "error"})
+
+
+# === ÚJ: SZINKRONIZÁLÁS TÖRZZSEL ===
+def sync_tetelsor_to_master(request, pk):
+    tetelsor = get_object_or_404(Tetelsor, id=pk)
+    if not tetelsor.master_item:
+        messages.error(request, "Ez a tétel nem csatolt a törzshöz!")
+        return redirect('project-detail', pk=tetelsor.project.id)
+
+    master = tetelsor.master_item
+    master.leiras = tetelsor.leiras
+    master.normaido = tetelsor.normaido
+    master.fix_anyag_ar = tetelsor.anyag_egysegar
+    master.egyseg = tetelsor.egyseg
+    master.save()
+
+    messages.success(request, f"A '{master.tetelszam}' törzs tétel frissítve!")
+    return redirect('project-detail', pk=tetelsor.project.id)
 
 
 def project_quote_html(request, pk):
@@ -285,7 +451,6 @@ def project_update(request, pk):
         if form.is_valid():
             form.save()
             if 'hourly_rate' in form.changed_data:
-                recalculate_dij = True
                 for t in project.tetelsorok.all(): t.save()
             return redirect('project-detail', pk=project.id)
     else:
@@ -304,14 +469,11 @@ def project_request_deletion(request, pk):
     return render(request, 'projects/project_confirm_delete.html', context)
 
 
-# --- IMPORT LOGIKA ---
+# --- IMPORT ---
 def import_tasks(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == 'POST' and 'temp_file_path' in request.POST:
         path = os.path.join(settings.MEDIA_ROOT, request.POST.get('temp_file_path'))
-        if not os.path.exists(path):
-            messages.error(request, "Fájl nem található!")
-            return redirect('import-tasks', project_id=project.id)
         wb = openpyxl.load_workbook(path, data_only=True)
         cnt = 1
         try:
@@ -412,7 +574,7 @@ def tetelsor_create_from_master_step2(request, project_id, master_id):
             tetel.master_item = master
             if not tetel.sorszam: tetel.sorszam = str(new_sorszam)
             tetel.save()
-            messages.success(request, "Hozzáadva!")
+            messages.success(request, "Tétel beillesztve!")
             return redirect('project-detail', pk=project.id)
     else:
         form = TetelsorEditForm(instance=t)
@@ -544,9 +706,8 @@ def daily_log_update(request, pk):
         if form.is_valid() and formset.is_valid():
             form.save()
             usages = formset.save(commit=False)
-
             for usage in usages:
-                if not usage.pk:  # Új sor
+                if not usage.pk:
                     usage.log = log
                     usage.save()
                     if usage.inventory_item:

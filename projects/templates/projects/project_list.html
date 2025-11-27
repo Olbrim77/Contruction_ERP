@@ -2,97 +2,96 @@
 {% load humanize %}
 
 {% block title %}Műszerfal - Kocsis Építő{% endblock %}
-
-{% block breadcrumbs %}
-    Kezdőlap / <span>Műszerfal & Projektek</span>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    /* KERESŐ */
-    .search-bar-container { background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 30px; display: flex; gap: 10px; }
-    .search-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-
-    /* DASHBOARD KÁRTYÁK */
-    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .card { background-color: #fff; border-radius: 8px; padding: 20px; border: 1px solid var(--border); border-top: 4px solid #ccc; }
-    .card.plan { border-top-color: #005a9c; } .card.spent { border-top-color: #d9534f; } .card.balance { border-top-color: #28a745; }
-    .card h3 { margin: 0 0 10px 0; font-size: 12px; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; }
-    .card .value { font-size: 24px; font-weight: bold; color: var(--text-dark); }
-    .text-success { color: #28a745; } .text-danger { color: #d9534f; }
-
-    /* GRAFIKONOK */
-    .charts-container { display: flex; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; }
-    .chart-box { background-color: #fff; border-radius: 8px; padding: 20px; border: 1px solid var(--border); flex: 1; min-width: 300px; height: 300px; }
-
-    /* PROJEKT KÁRTYÁK */
-    .project-section { margin-bottom: 40px; }
-    .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; color: #444; }
-    .counter { background: #e9ecef; color: #555; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
-
-    .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-    .project-card {
-        background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px;
-        transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; justify-content: space-between;
-    }
-    .project-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-color: var(--primary); }
-    .project-title { font-size: 18px; font-weight: 600; color: var(--primary); margin: 0 0 10px 0; }
-    .project-meta { font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 15px; }
-    .project-footer { border-top: 1px solid #f0f0f0; padding-top: 15px; margin-top: auto; display: flex; justify-content: space-between; font-size: 12px; color: #999; }
-</style>
-{% endblock %}
+{% block breadcrumbs %}Kezdőlap / <span>Műszerfal</span>{% endblock %}
 
 {% block content %}
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin:0;">Vállalati Áttekintés</h2>
+        <form method="GET" style="flex-grow:1; margin-right:20px; display:flex; gap:10px;">
+            <input type="text" name="q" class="form-control" placeholder="Keresés..." value="{{ search_query }}" style="padding:10px; width:100%; border:1px solid #ccc; border-radius:4px;">
+            <button type="submit" class="btn btn-secondary">Keresés</button>
+        </form>
         <a href="{% url 'project-create' %}" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Új Projekt</a>
     </div>
 
-    <form method="GET" class="search-bar-container">
-        <input type="text" name="q" class="search-input" placeholder="Keresés név, helyszín vagy ügyfél alapján..." value="{{ search_query }}">
-        <button type="submit" class="btn btn-secondary">Keresés</button>
-        {% if search_query %}<a href="{% url 'project-list' %}" style="color:#d9534f; font-weight:bold;">X</a>{% endif %}
-    </form>
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px;">
 
-    <div class="dashboard-grid">
-        <div class="card plan"><h3>Tervezett Költség</h3><div class="value">{{ global_plan|floatformat:0|intcomma }} Ft</div></div>
-        <div class="card spent"><h3>Valós Költés</h3><div class="value">{{ global_spent|floatformat:0|intcomma }} Ft</div></div>
-        <div class="card balance"><h3>Egyenleg</h3><div class="value {% if global_balance >= 0 %}text-success{% else %}text-danger{% endif %}">{{ global_balance|floatformat:0|intcomma }} Ft</div></div>
-    </div>
+        <div style="background:#fff; border:1px solid #e1e4e8; border-radius:8px; padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:#005a9c;">📌 Függő Feladatok</h3>
+                <button onclick="document.getElementById('newTaskForm').style.display='block'" class="btn btn-sm btn-success">+ Új</button>
+            </div>
 
-    <div class="charts-container">
-        <div class="chart-box"><canvas id="financeChart"></canvas></div>
-        <div class="chart-box"><canvas id="statusChart"></canvas></div>
+            <div id="newTaskForm" style="display:none; background:#f8f9fa; padding:10px; margin-bottom:10px; border-radius:4px;">
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="task_submit" value="1">
+                    <div style="display:flex; gap:10px;">
+                        {{ task_form.project }}
+                        {{ task_form.name }}
+                        {{ task_form.due_date }}
+                        <button type="submit" class="btn btn-sm btn-primary">Mentés</button>
+                    </div>
+                </form>
+            </div>
+
+            <table style="width:100%; border-collapse:collapse;">
+                <thead style="background:#f8f9fa;">
+                    <tr>
+                        <th style="padding:10px; text-align:left;">Határidő</th>
+                        <th style="padding:10px; text-align:left;">Projekt</th>
+                        <th style="padding:10px; text-align:left;">Feladat</th>
+                        <th style="padding:10px; text-align:center;">Kész?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tasks %}
+                    <tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:10px; color:{% if t.due_date < today %}red{% else %}#555{% endif %};">
+                            {{ t.due_date|date:"m.d"|default:"-" }}
+                        </td>
+                        <td style="padding:10px; font-weight:bold; color:#005a9c;">{{ t.project.name|truncatechars:20 }}</td>
+                        <td style="padding:10px;">{{ t.name }}</td>
+                        <td style="padding:10px; text-align:center;">
+                            <a href="{% url 'task-complete' t.id %}" class="btn-icon" style="color:#28a745; cursor:pointer;">✔</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" style="text-align:center; padding:20px; color:#777;">Nincs függő feladat. 🏖️</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:15px;">
+            <div class="card plan" style="background:#fff; padding:20px; border-radius:8px; border-left:5px solid #005a9c; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <h3 style="margin:0 0 5px 0; font-size:12px; color:#666;">TERVEZETT</h3>
+                <div style="font-size:24px; font-weight:bold;">{{ global_plan|floatformat:0|intcomma }} Ft</div>
+            </div>
+            <div class="card spent" style="background:#fff; padding:20px; border-radius:8px; border-left:5px solid #d9534f; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <h3 style="margin:0 0 5px 0; font-size:12px; color:#666;">KÖLTÉS</h3>
+                <div style="font-size:24px; font-weight:bold;">{{ global_spent|floatformat:0|intcomma }} Ft</div>
+            </div>
+            <div class="card balance" style="background:#fff; padding:20px; border-radius:8px; border-left:5px solid #28a745; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                <h3 style="margin:0 0 5px 0; font-size:12px; color:#666;">EGYENLEG</h3>
+                <div style="font-size:24px; font-weight:bold;">{{ global_balance|floatformat:0|intcomma }} Ft</div>
+            </div>
+        </div>
     </div>
 
     {% for group in project_groups %}
-        <div class="project-section">
-            <div class="section-title">
-                {{ group.label }} <span class="counter">{{ group.projects.count }}</span>
-            </div>
-            <div class="project-grid">
-                {% for p in group.projects %}
-                    <a href="{% url 'project-detail' p.id %}" class="project-card">
-                        <div class="project-title">{{ p.name }}</div>
-                        <div class="project-meta">
-                            <div><i class="fa-solid fa-location-dot"></i> {{ p.location }}</div>
-                            <div><i class="fa-solid fa-user"></i> {{ p.contact_name|default:p.client }}</div>
-                            {% if p.budget %}<div style="margin-top:5px; font-weight:bold;">💰 {{ p.budget|floatformat:0|intcomma }} Ft</div>{% endif %}
-                        </div>
-                        <div class="project-footer">
-                            <span>Kezdés: {{ p.start_date|date:"Y.m.d"|default:"-" }}</span>
-                            <span>#{{ p.id }}</span>
-                        </div>
-                    </a>
-                {% endfor %}
-            </div>
+        <h3 style="border-bottom:2px solid #eee; padding-bottom:10px; margin-top:30px;">{{ group.label }}</h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+            {% for p in group.projects %}
+                <a href="{% url 'project-detail' p.id %}" style="background:#fff; padding:20px; border-radius:8px; border:1px solid #e1e4e8; text-decoration:none; color:#333; transition:0.2s; display:block;">
+                    <div style="font-size:18px; font-weight:bold; color:#005a9c; margin-bottom:5px;">{{ p.name }}</div>
+                    <div style="font-size:13px; color:#666;"><i class="fa-solid fa-location-dot"></i> {{ p.location }}</div>
+                    <div style="margin-top:15px; font-size:12px; color:#999; display:flex; justify-content:space-between;">
+                        <span>{{ p.contact_name|default:p.client }}</span>
+                        <span>{{ p.start_date|date:"Y.m.d"|default:"-" }}</span>
+                    </div>
+                </a>
+            {% endfor %}
         </div>
-    {% empty %}
-        <div style="text-align:center; padding:50px; color:#777;"><h3>Nincsenek projektek.</h3></div>
     {% endfor %}
 
-    <script>
-        new Chart(document.getElementById('financeChart'), { type: 'bar', data: { labels: ['Tervezett', 'Tény'], datasets: [{ label: 'Ft', data: [{{ global_plan|stringformat:"f" }}, {{ global_spent|stringformat:"f" }}], backgroundColor: ['#005a9c', '#d9534f'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: {display:true, text:'Pénzügyek'} } } });
-        new Chart(document.getElementById('statusChart'), { type: 'doughnut', data: { labels: ['Tervezés', 'Folyamatban', 'Kész', 'Lezárt'], datasets: [{ data: [{{ status_counts.TERVEZES }}, {{ status_counts.FOLYAMATBAN }}, {{ status_counts.BEFEJEZETT }}, {{ status_counts.LEZART }}], backgroundColor: ['#ffc107', '#28a745', '#17a2b8', '#343a40'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: {display:true, text:'Státusz'}, legend:{position:'right'} } } });
-    </script>
 {% endblock %}
