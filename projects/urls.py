@@ -65,6 +65,16 @@ urlpatterns = [
     path('project/<int:project_id>/gantt/data/', views.gantt_data, name='gantt-data'),
     path('project/<int:project_id>/gantt/update/', views.gantt_update, name='gantt-update'), # <-- ÚJ
     path('tetelsor/<int:pk>/sync-to-master/', views.sync_tetelsor_to_master, name='sync-tetelsor-to-master'),
+    # === ÚJ MODULOK (Helyőrzők) ===
+    path('resources/', views.resource_planning, name='resource-planning'),
+    path('hr/', views.hr_dashboard, name='hr-dashboard'),
+    path('inventory/', views.global_inventory, name='global-inventory'),
+    path('finance/', views.finance_dashboard, name='finance-dashboard'),
+    path('assets/', views.asset_list, name='asset-list'),
+    path('map/', views.project_map_view, name='project-map'),
+    path('crm/', views.crm_dashboard, name='crm-dashboard'),
+
+    # === GLOBÁLIS GANTT ===
     path('global-gantt/', views.global_gantt_view, name='global-gantt'),
     path('global-gantt/data/', views.global_gantt_data, name='global-gantt-data'),
     path('global-gantt/update/', views.global_gantt_update, name='global-gantt-update'),

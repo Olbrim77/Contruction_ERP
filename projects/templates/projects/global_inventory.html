@@ -1,0 +1,29 @@
+{% extends 'projects/base.html' %}
+{% block title %}Központi Raktár{% endblock %}
+{% block content %}
+    <h2>🏭 Központi Raktárkészlet</h2>
+    <p>Itt látod az összes projektben lévő, még be nem épített anyagot.</p>
+
+    <table class="excel-table" style="width:100%; border-collapse:collapse; background:#fff; border:1px solid #ddd;">
+        <thead style="background:#f8f9fa;">
+            <tr>
+                <th style="padding:10px;">Projekt</th>
+                <th style="padding:10px;">Anyag</th>
+                <th style="padding:10px;">Mennyiség</th>
+                <th style="padding:10px;">Egység</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory %}
+            <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:10px;"><strong>{{ item.project.name }}</strong></td>
+                <td style="padding:10px;">{{ item.name }}</td>
+                <td style="padding:10px; font-weight:bold; color:#005a9c;">{{ item.quantity }}</td>
+                <td style="padding:10px;">{{ item.unit }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="padding:20px; text-align:center;">A raktár üres.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

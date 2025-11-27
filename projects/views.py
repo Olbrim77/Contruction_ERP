@@ -1095,3 +1095,48 @@ def global_gantt_update(request):
             return JsonResponse({"action": "error", "msg": str(e)})
 
     return JsonResponse({"action": "error"})
+
+# projects/views.py (A fájl végére add hozzá ezeket)
+
+# === ÚJ MODULOK HELYŐRZŐI ===
+
+def resource_planning(request):
+    """ Éves Erőforrás Ütemezés """
+    # Itt később a brigádok/alvállalkozók naptárát jelenítjük meg
+    return render(request, 'projects/placeholder.html', {'title': 'Éves Erőforrás Ütemezés'})
+
+def hr_dashboard(request):
+    """ HR Modul """
+    # Itt lesznek a munkavállalók, jelenléti ívek, bérszámfejtési adatok
+    return render(request, 'projects/placeholder.html', {'title': 'HR és Munkaügy'})
+
+def global_inventory(request):
+    """ Központi Raktárkészlet """
+    # Összesítjük az összes projekt készletét
+    all_items = ProjectInventory.objects.all().order_by('name')
+    return render(request, 'projects/global_inventory.html', {'inventory': all_items})
+
+def finance_dashboard(request):
+    """ Pénzügyi Központ """
+    # Összesített bevételek és kiadások
+    total_expenses = Expense.objects.aggregate(Sum('amount_netto'))['amount_netto__sum'] or 0
+    # Később itt lesznek a számlák, áfa kimutatások
+    return render(request, 'projects/placeholder.html', {'title': 'Pénzügyi Kimutatások', 'total': total_expenses})
+
+
+def asset_list(request):
+    """ 🚜 Géppark Kezelő (Assets) """
+    # Itt lesznek a gépek, szerszámok, lejárati dátumok
+    return render(request, 'projects/placeholder.html', {'title': '🚜 Géppark és Eszközök'})
+
+def project_map_view(request):
+    """ 🗺️ Térkép Nézet """
+    # Itt jelenítjük majd meg a Google Maps / OpenStreetMap térképet
+    # Csak az aktív projekteket küldjük majd le
+    active_projects = Project.objects.exclude(status__in=['LEZART', 'ELUTASITVA'])
+    return render(request, 'projects/placeholder.html', {'title': '🗺️ Projektek Térképen'})
+
+def crm_dashboard(request):
+    """ 🤝 CRM / Ügyfélkezelés """
+    # Potenciális ügyfelek (Leads) és értékesítési tölcsér
+    return render(request, 'projects/placeholder.html', {'title': '🤝 CRM és Értékesítés'})

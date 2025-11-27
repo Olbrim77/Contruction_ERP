@@ -1,0 +1,12 @@
+{% extends 'projects/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div style="text-align: center; padding: 50px;">
+    <i class="fa-solid fa-person-digging" style="font-size: 60px; color: #005a9c; margin-bottom: 20px;"></i>
+    <h1>{{ title }}</h1>
+    <p style="color: #666; font-size: 18px;">Ez a modul fejlesztés alatt áll.</p>
+    {% if total %}
+        <p>Eddigi összes kiadás: <strong>{{ total }} Ft</strong></p>
+    {% endif %}
+</div>
+{% endblock %}
