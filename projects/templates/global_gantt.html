@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Cégszintű Ütemterv</title>
+    <script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
+    <link href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css" rel="stylesheet">
+    <script src="https://cdn.dhtmlx.com/gantt/edge/ext/dhtmlxgantt_marker.js"></script>
+
+    <style>
+        html, body { height: 100%; padding: 0; margin: 0; font-family: 'Segoe UI', sans-serif; }
+        #gantt_here { width: 100%; height: 100%; }
+
+        .gantt-header { padding: 15px; background: #333; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 8px 15px; background: #005a9c; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; }
+
+        /* Projektek (Szülő sorok) stílusa */
+        .gantt_task_line.gantt_project { background-color: #666; border-color: #444; }
+        .gantt_row.gantt_project { background-color: #f4f4f4; font-weight: bold; }
+
+        /* Kész feladat */
+        .completed_task { border: 1px solid #28a745; background: #28a745; }
+        .completed_task .gantt_task_progress { background: #1e7e34; }
+
+        /* Hétvége */
+        .weekend { background: #f4f7f4 !important; }
+        .today_marker { background: rgba(255, 0, 0, 0.4); }
+    </style>
+</head>
+<body>
+
+<div class="gantt-header">
+    <div>
+        <i class="fa fa-sitemap"></i> <strong>Cégszintű Ütemterv</strong> (Minden aktív projekt)
+    </div>
+    <a href="{% url 'project-list' %}" class="btn" style="background:#555;">Vissza a Műszerfalra</a>
+</div>
+
+<div id="gantt_here"></div>
+
+<script>
+    // 1. ADATOK (Erőforrások)
+    var alvallalkozok = [
+        { key: "", label: "Nincs kijelölve" },
+        {% for a in alvallalkozok %}
+            { key: "{{ a.id }}", label: "{{ a.nev }}" },
+        {% endfor %}
+    ];
+
+    // 2. KONFIGURÁCIÓ
+    gantt.plugins({ marker: true });
+    gantt.i18n.setLocale("hu");
+    gantt.config.date_format = "%Y-%m-%d";
+    gantt.config.xml_date = "%Y-%m-%d";
+    gantt.config.open_tree_initially = false; // Fontos: Összecsukva indul!
+    gantt.config.order_branch = true; // Sorrendezés engedélyezése
+
+    // Oszlopok
+    gantt.config.columns = [
+        {name: "text", label: "Projekt / Feladat", width: 250, tree: true, resize: true},
+        {name: "start_date", label: "Kezdés", align: "center", width: 80},
+        {name: "duration", label: "Nap", align: "center", width: 40},
+
+        // ERŐFORRÁS OSZLOP
+        {name: "owner_id", label: "Erőforrás", width: 120, align: "center", template: function(item) {
+            if (item.type == 'project') return ""; // Projektnél ne írjon ki semmit
+            var alv = alvallalkozok.find(x => x.key == item.owner_id);
+            return alv ? alv.label : "-";
+        }},
+
+        {name: "add", label: "", width: 30}
+    ];
+
+    // 3. SZERKESZTŐ ABLAK (LIGHTBOX) KONFIGURÁLÁSA
+    gantt.locale.labels.section_owner = "Alvállalkozó";
+    gantt.locale.labels.section_felelos = "Felelős";
+
+    gantt.config.lightbox.sections = [
+        {name: "description", height: 38, map_to: "text", type: "textarea", focus: true},
+        {name: "owner", height: 22, map_to: "owner_id", type: "select", options: alvallalkozok},
+        {name: "felelos", height: 22, map_to: "felelos", type: "textarea"},
+        {name: "time", height: 72, type: "duration", map_to: "auto"}
+    ];
+
+    // 4. MEGJELENÍTÉS EXTRÁK
+    gantt.templates.task_class = function(start, end, task){
+        if (task.progress >= 1) return "completed_task";
+        return "";
+    };
+
+    // Mai nap
+    var today = new Date();
+    gantt.addMarker({ start_date: today, css: "today_marker", text: "Ma" });
+
+    // Hétvége
+    gantt.templates.timeline_cell_class = function(task, date){
+        if(date.getDay() == 0 || date.getDay() == 6) return "weekend";
+    };
+
+    // 5. INDÍTÁS
+    gantt.init("gantt_here");
+    gantt.load("{% url 'global-gantt-data' %}", "json");
+
+    // 6. MENTÉS
+    var dp = new gantt.dataProcessor("{% url 'global-gantt-update' %}");
+    dp.init(gantt);
+    dp.setTransactionMode("POST", false);
+</script>
+
+</body>
+</html>

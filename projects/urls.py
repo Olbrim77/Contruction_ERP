@@ -61,12 +61,11 @@ urlpatterns = [
     path('mobile/project/<int:project_id>/log/', views_mobile.mobile_daily_log, name='mobile-daily-log'),
     path('task/<int:pk>/complete/', views.task_complete, name='task-complete'),
     path('task/<int:pk>/complete/', views.task_complete, name='task-complete'),
-path('project/<int:project_id>/gantt/', views.gantt_view, name='gantt-view'),
+    path('project/<int:project_id>/gantt/', views.gantt_view, name='gantt-view'),
     path('project/<int:project_id>/gantt/data/', views.gantt_data, name='gantt-data'),
     path('project/<int:project_id>/gantt/update/', views.gantt_update, name='gantt-update'), # <-- ÚJ
-path('tetelsor/<int:pk>/sync-to-master/', views.sync_tetelsor_to_master, name='sync-tetelsor-to-master'),
-
-
-
-
+    path('tetelsor/<int:pk>/sync-to-master/', views.sync_tetelsor_to_master, name='sync-tetelsor-to-master'),
+    path('global-gantt/', views.global_gantt_view, name='global-gantt'),
+    path('global-gantt/data/', views.global_gantt_data, name='global-gantt-data'),
+    path('global-gantt/update/', views.global_gantt_update, name='global-gantt-update'),
 ]

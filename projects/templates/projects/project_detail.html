@@ -126,18 +126,48 @@
             <a href="{% url 'import-tasks' project.id %}" class="btn btn-sm btn-secondary">Excel Import</a>
             <a href="{% url 'tetelsor-create-master-step1' project.id %}" class="btn btn-sm btn-success">+ Új Tétel</a>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="table-responsive">
             <table class="excel-table">
-                <thead><tr><th>Kód</th><th>Leírás</th><th>Menny.</th><th>Egység</th><th>Ár</th><th>Összesen</th><th></th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Kód</th>
+                        <th>Leírás</th>
+                        <th>Menny.</th>
+                        <th>Egység</th>
+                        <th class="numeric">Anyagár</th>
+                        <th class="numeric">Díj</th>
+                        <th class="numeric">Összesen</th>
+                        <th style="width: 120px; text-align: center;">Művelet</th>
+                    </tr>
+                </thead>
                 <tbody>
                     {% for t in tasks %}
                     <tr>
-                        <td>{{ t.tetelszam }}</td><td>{{ t.leiras|truncatechars:50 }}</td>
+                        <td><small>{{ t.tetelszam }}</small></td>
+                        <td>{{ t.leiras|truncatechars:50 }}</td>
                         <td><a href="{% url 'tetelsor-edit-quantity' t.id %}" style="font-weight:bold;">{{ t.mennyiseg }}</a></td>
-                        <td>{{ t.egyseg }}</td><td class="numeric">{{ t.anyag_egysegar|floatformat:0 }}</td>
-                        <td class="numeric"><strong>{{ t.anyag_osszesen|add:t.sajat_munkadij_osszesen|floatformat:0 }}</strong></td>
-                        <td><a href="{% url 'tetelsor-edit' t.id %}">✏️</a> <a href="{% url 'tetelsor-delete' t.id %}" style="color:red;">🗑️</a></td>
+                        <td>{{ t.egyseg }}</td>
+                        <td class="numeric">{{ t.anyag_egysegar|floatformat:0|intcomma }}</td>
+                        <td class="numeric">{{ t.dij_egysegre_sajat|add:t.dij_egysegre_alv|floatformat:0|intcomma }}</td>
+                        <td class="numeric"><strong>{{ t.anyag_osszesen|add:t.sajat_munkadij_osszesen|add:t.alv_munkadij_osszesen|floatformat:0|intcomma }}</strong></td>
+                        <td style="text-align: center;">
+                            <a href="{% url 'tetelsor-edit' t.id %}" class="btn-icon" title="Szerkesztés">✏️</a>
+
+                            {% if t.master_item %}
+                            <a href="{% url 'sync-tetelsor-to-master' t.id %}"
+                               class="btn-icon"
+                               style="color: #005a9c; background-color: #e3f2fd;"
+                               title="Változások mentése a Központi Adattörzsbe (Frissíti az eredeti tételt!)"
+                               onclick="return confirm('Biztosan felülírod a központi katalógusban lévő tételt a projekt adataival?');">
+                                💾
+                            </a>
+                            {% endif %}
+
+                            <a href="{% url 'tetelsor-delete' t.id %}" class="btn-icon danger" title="Törlés">🗑️</a>
+                        </td>
                     </tr>
+                    {% empty %}
+                    <tr><td colspan="8" style="text-align:center; padding:30px; color:#999;">A költségvetés üres.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

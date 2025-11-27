@@ -141,14 +141,20 @@ def project_list(request):
             projs = projects.filter(status=sc)
             if projs.exists(): project_groups.append({'label': sl, 'projects': projs})
 
+    # ITT A LÉNYEG: Explicit kulcsnevek (ls, la) használata
     all_budgets = Tetelsor.objects.filter(project__in=projects).aggregate(
-        mat=Sum('anyag_osszesen'), ls=Sum('sajat_munkadij_osszesen'), la=Sum('alv_munkadij_osszesen')
+        mat=Sum('anyag_osszesen'),
+        ls=Sum('sajat_munkadij_osszesen'),  # ls = Labor Sajat
+        la=Sum('alv_munkadij_osszesen')  # la = Labor Alvallalkozo
     )
+
+    # És itt hivatkozunk rájuk:
     global_plan = (all_budgets['mat'] or 0) + (all_budgets['ls'] or 0) + (all_budgets['la'] or 0)
+
     global_spent = Expense.objects.filter(project__in=projects).aggregate(s=Sum('amount_netto'))['s'] or 0
     global_balance = global_plan - global_spent
 
-    # Feladatok (To-Do)
+    # Feladatok
     tasks = Task.objects.filter(status='FUGGO').order_by('due_date')
 
     if request.method == 'POST' and 'task_submit' in request.POST:
@@ -992,3 +998,100 @@ def material_order_finalize(request, pk):
         messages.success(request, "Rendelés lezárva és könyvelve!")
         return redirect('project-detail', pk=order.project.id)
     return render(request, 'projects/material_order_finalize.html', {'order': order})
+
+
+# projects/views.py (A fájl végére illeszd be)
+
+# === GLOBÁLIS GANTT (CÉGSZINTŰ) ===
+
+def global_gantt_view(request):
+    # Alvállalkozók a legördülőhöz
+    alvallalkozok = Alvallalkozo.objects.all().values('id', 'nev')
+    return render(request, 'projects/global_gantt.html', {
+        'alvallalkozok': list(alvallalkozok)
+    })
+
+
+def global_gantt_data(request):
+    # 1. PROJEKTEK LEKÉRÉSE (Mint "Szülő" elemek)
+    # Csak a nem törölt projektek kellenek
+    projects = Project.objects.exclude(status='TORLES_KERELEM').order_by('start_date')
+
+    data = []
+
+    # Projektek hozzáadása a listához
+    for p in projects:
+        start = p.start_date or timezone.now().date()
+        # A projekt egy "gyűjtő" feladat lesz
+        data.append({
+            'id': f"prj_{p.id}",  # Egyedi ID prefix
+            'text': p.name,
+            'start_date': start.strftime("%Y-%m-%d"),
+            'type': 'project',  # DHTMLX speciális típus
+            'open': False,  # Alapból összecsukva (vagy True ha nyitva akarod)
+            'readonly': True  # A projekt nevét/idejét itt ne szerkesszék, az számolódjon
+        })
+
+    # 2. FELADATOK LEKÉRÉSE (Mint "Gyerek" elemek)
+    tasks = Tetelsor.objects.filter(project__in=projects).order_by('sorszam')
+
+    for t in tasks:
+        start = t.project.start_date or timezone.now().date()
+
+        # Időtartam logika (ugyanaz, mint az egyedinél)
+        duration = 1
+        if t.gantt_start_date and t.gantt_duration and t.gantt_duration > 0:
+            duration = t.gantt_duration
+        elif t.normaido and t.mennyiseg:
+            try:
+                hpd = float(t.project.hours_per_day or 8)
+                total = float(t.mennyiseg) * float(t.normaido)
+                if hpd > 0: duration = math.ceil(total / hpd)
+            except:
+                pass
+        if duration < 1: duration = 1
+
+        # Dátumok
+        start_date_obj = t.gantt_start_date if t.gantt_start_date else start
+        start_date_str = start_date_obj.strftime("%Y-%m-%d")
+
+        # Szöveg
+        txt = t.leiras if t.leiras else (t.master_item.leiras if t.master_item else "-")
+        tszam = t.master_item.tetelszam if t.master_item else ""
+
+        data.append({
+            'id': t.id,  # Sima ID
+            'text': f"{tszam} - {txt[:30]}...",
+            'start_date': start_date_str,
+            'duration': duration,
+            'progress': float(t.progress_percentage) / 100 if t.progress_percentage else 0,
+            'parent': f"prj_{t.project.id}",  # <-- EZ RENDELI A PROJEKTHEZ!
+            'owner_id': t.alvallalkozo.id if t.alvallalkozo else "",
+            'felelos': t.felelos or ""
+        })
+
+    # 3. LINKEK
+    links = GanttLink.objects.filter(source__project__in=projects)
+    link_data = [{'id': l.id, 'source': l.source.id, 'target': l.target.id, 'type': l.type} for l in links]
+
+    return JsonResponse({"data": data, "links": link_data})
+
+
+@csrf_exempt
+def global_gantt_update(request):
+    """ Globális mentés kezelő """
+    if request.method == 'POST':
+        try:
+            sid = request.POST.get("id")
+
+            # Ha PROJEKTET próbálnának mozgatni (prj_ prefix), azt ignoráljuk vagy tiltjuk
+            if str(sid).startswith("prj_"):
+                return JsonResponse({"action": "error", "msg": "A projektet magát nem mozgathatod, csak a feladatait!"})
+
+            # Egyébként hívjuk a sima mentést (DRY elv - Don't Repeat Yourself)
+            return gantt_update(request, None)  # A project_id itt nem kell, mert az ID globális
+
+        except Exception as e:
+            return JsonResponse({"action": "error", "msg": str(e)})
+
+    return JsonResponse({"action": "error"})
