@@ -21,7 +21,7 @@ from .models import (
     Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
     Supplier, Material, MasterItem, ItemComponent, CompanySettings,
     ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage,
-    GanttLink
+    GanttLink, UniclassNode
 )
 
 # Űrlapok importálása
@@ -1140,3 +1140,58 @@ def crm_dashboard(request):
     """ 🤝 CRM / Ügyfélkezelés """
     # Potenciális ügyfelek (Leads) és értékesítési tölcsér
     return render(request, 'projects/placeholder.html', {'title': '🤝 CRM és Értékesítés'})
+
+
+
+
+def uniclass_tree_data(request):
+    """
+    JSON adatot szolgáltat a JSTree-nek az Uniclass választóhoz.
+    """
+    # Csak a szükséges mezőket kérjük le a gyorsaság érdekében
+    nodes = UniclassNode.objects.all().values('code', 'title_en', 'title_hu', 'parent__code')
+
+    data = []
+    for n in nodes:
+        # Ha van magyar név, azt írjuk ki, ha nincs, az angolt
+        label = n['title_hu'] if n['title_hu'] else n['title_en']
+
+        data.append({
+            "id": n['code'],
+            "parent": n['parent__code'] if n['parent__code'] else "#",  # '#' jelzi a gyökérelemet a JSTree-ben
+            "text": f"{n['code']} - {label}",
+            "icon": "fa fa-folder" if not n['parent__code'] else "fa fa-file"  # Ikonok
+        })
+
+    return JsonResponse(data, safe=False)
+
+
+# projects/views.py (A FÁJL VÉGÉRE)
+
+# ... (előző kódok) ...
+
+# === UNICLASS API (EZ HIÁNYZOTT) ===
+def uniclass_tree_data(request):
+    """
+    JSON adatot szolgáltat a JSTree-nek az Uniclass választóhoz.
+    """
+    # Csak a szükséges mezőket kérjük le a gyorsaság érdekében
+    # Ha sok adat van, érdemes lenne lazy loadingot használni, de egyelőre töltsük be mindet
+    nodes = UniclassNode.objects.all().values('id', 'code', 'title_en', 'title_hu', 'parent_id')
+
+    data = []
+    for n in nodes:
+        # Címke: Kód - Név (Magyar ha van, amúgy Angol)
+        label = n['title_hu'] if n['title_hu'] else n['title_en']
+        text = f"{n['code']} - {label}"
+
+        # JSTree formátum
+        data.append({
+            "id": str(n['id']),  # Fontos: String ID
+            "parent": str(n['parent_id']) if n['parent_id'] else "#",  # '#' jelzi a gyökérelemet
+            "text": text,
+            "icon": "fa fa-folder" if not n['parent_id'] else "fa fa-tag",
+            "a_attr": {"title": text}  # Tooltip
+        })
+
+    return JsonResponse(data, safe=False)

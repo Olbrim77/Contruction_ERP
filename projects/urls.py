@@ -78,4 +78,8 @@ urlpatterns = [
     path('global-gantt/', views.global_gantt_view, name='global-gantt'),
     path('global-gantt/data/', views.global_gantt_data, name='global-gantt-data'),
     path('global-gantt/update/', views.global_gantt_update, name='global-gantt-update'),
+    path('tetelsor/<int:pk>/sync-to-master/', views.sync_tetelsor_to_master, name='sync-tetelsor-to-master'),
+
+    path('api/uniclass-tree/', views.uniclass_tree_data, name='uniclass-tree-data'),
+
 ]

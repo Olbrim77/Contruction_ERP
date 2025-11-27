@@ -44,6 +44,31 @@ class Project(models.Model):
     class Meta: verbose_name = "Projekt"; verbose_name_plural = "Projektek"
 
 
+# --- ÚJ: UNICLASS 2015 STRUKTÚRA ---
+class UniclassNode(models.Model):
+    """
+    Az Uniclass hierarchikus felépítése (Táblák -> Csoportok -> Termékek).
+    Példa: Pr_25_57_04 (Ceramic tiles)
+    """
+    code = models.CharField(max_length=20, unique=True, verbose_name="Uniclass Kód")  # Pl. Pr_25_57_04
+    title_en = models.CharField(max_length=255, verbose_name="Megnevezés (EN)")
+    title_hu = models.CharField(max_length=255, verbose_name="Megnevezés (HU)", blank=True)
+    table = models.CharField(max_length=10, verbose_name="Tábla kód")  # Pl. Pr, Ef, Ss
+
+    # Hierarchia: Önmagára hivatkozik
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children',
+                               verbose_name="Szülő kategória")
+
+    def __str__(self):
+        label = self.title_hu if self.title_hu else self.title_en
+        return f"{self.code} - {label}"
+
+    class Meta:
+        verbose_name = "Uniclass Kategória"
+        verbose_name_plural = "Uniclass Kategóriák"
+        ordering = ['code']
+
+
 # --- TÖRZSADATOK ---
 class Munkanem(models.Model):
     nev = models.CharField(max_length=150, unique=True)
@@ -80,6 +105,11 @@ class MasterItem(models.Model):
     normaido = models.DecimalField(max_digits=10, decimal_places=2, default=0);
     fix_anyag_ar = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # ÚJ MEZŐ: Összekapcsolás az Uniclass-szal
+    uniclass_item = models.ForeignKey(UniclassNode, on_delete=models.SET_NULL, null=True, blank=True,
+                                      verbose_name="Uniclass Besorolás")
+
     engy_kod = models.CharField(max_length=50, blank=True, null=True);
     k_jelzo = models.CharField(max_length=50, blank=True, null=True);
     cpr_kod = models.CharField(max_length=50, blank=True, null=True)
@@ -91,6 +121,8 @@ class MasterItem(models.Model):
 
     def __str__(self): return self.tetelszam
 
+    class Meta: verbose_name = "Törzs Tétel"; verbose_name_plural = "Törzs Tételek"
+
 
 class ItemComponent(models.Model):
     master_item = models.ForeignKey(MasterItem, related_name='components', on_delete=models.CASCADE)
@@ -98,7 +130,7 @@ class ItemComponent(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
 
-# --- TÉTELSOR (OKOS MENTÉSSEL) ---
+# --- TÉTELSOR ---
 class Tetelsor(models.Model):
     project = models.ForeignKey(Project, related_name='tetelsorok', on_delete=models.CASCADE)
     master_item = models.ForeignKey(MasterItem, on_delete=models.PROTECT)
@@ -130,7 +162,6 @@ class Tetelsor(models.Model):
     felelos = models.CharField(max_length=100, blank=True, verbose_name="Felelős")
 
     def save(self, *args, **kwargs):
-        # 1. Adatok másolása a törzsből (csak létrehozáskor)
         if self.master_item and not self.leiras:
             self.leiras = self.master_item.leiras;
             self.egyseg = self.master_item.egyseg;
@@ -142,7 +173,6 @@ class Tetelsor(models.Model):
             if not self.anyag_egysegar: self.anyag_egysegar = self.master_item.calculated_material_cost
         if self.material and self.material.price is not None: self.anyag_egysegar = self.material.price
 
-        # 2. Pénzügyi számítások
         rate = Decimal(str(self.project.hourly_rate or 0));
         norma = Decimal(str(self.normaido or 0));
         mennyiseg = Decimal(str(self.mennyiseg or 0))
@@ -155,13 +185,10 @@ class Tetelsor(models.Model):
         self.sajat_munkadij_osszesen = mennyiseg * self.dij_egysegre_sajat;
         self.alv_munkadij_osszesen = mennyiseg * self.dij_egysegre_alv
 
-        # 3. GANTT IDŐTARTAM SZÁMÍTÁS (Ha még nincs kézi érték)
-        # Ha az időtartam 1 (alapérték), akkor kiszámoljuk a valósat
         if (not self.gantt_duration or self.gantt_duration <= 1) and norma > 0 and mennyiseg > 0:
             hpd = float(self.project.hours_per_day or 8)
             total_hours = float(mennyiseg * norma)
-            if hpd > 0:
-                self.gantt_duration = math.ceil(total_hours / hpd)
+            if hpd > 0: self.gantt_duration = math.ceil(total_hours / hpd)
             if self.gantt_duration < 1: self.gantt_duration = 1
 
         super().save(*args, **kwargs)
@@ -295,3 +322,5 @@ class GanttLink(models.Model):
     source = models.ForeignKey(Tetelsor, related_name='source_links', on_delete=models.CASCADE)
     target = models.ForeignKey(Tetelsor, related_name='target_links', on_delete=models.CASCADE)
     type = models.CharField(max_length=2, default='0')
+
+    def __str__(self): return f"{self.source} -> {self.target}"
