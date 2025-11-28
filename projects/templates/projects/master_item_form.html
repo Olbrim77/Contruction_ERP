@@ -1,167 +1,141 @@
 {% extends 'projects/base.html' %}
+{% load humanize %}
 
 {% block title %}{{ title }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
-
 <style>
-    .form-card { background: #fff; padding: 30px; border-radius: 8px; border: 1px solid #e1e4e8; max-width: 800px; margin: 0 auto; }
-    .form-group { margin-bottom: 20px; }
-    label { display: block; font-weight: bold; margin-bottom: 8px; color: #333; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+    .container { max-width: 1100px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .full-width { grid-column: span 2; }
+    label { font-weight: bold; margin-bottom: 5px; display: block; color: #555; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
 
-    /* Választó mező */
-    .uniclass-wrapper { display: flex; gap: 10px; }
-    .uniclass-display { flex-grow: 1; background: #f8f9fa; border: 1px solid #ccc; padding: 10px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
-    .uniclass-display:hover { background: #e9ecef; border-color: #bbb; }
+    /* Uniclass mező */
+    .uniclass-display { background: #f0f4f8; border: 1px dashed #005a9c; padding: 10px; border-radius: 4px; cursor: pointer; text-align: center; color: #005a9c; font-weight: bold; }
+
+    /* Komponens táblázatok */
+    h3 { background: #f8f9fa; padding: 10px; border-left: 5px solid #005a9c; margin-top: 40px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+    th { background: #f1f1f1; font-size: 0.9em; text-transform: uppercase; }
 
     /* Modal */
-    .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 8px; height: 70vh; display: flex; flex-direction: column; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
-    .modal-body { flex-grow: 1; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 4px; }
-    #tree-search { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border-radius: 8px; width: 60%; height: 70vh; display: flex; flex-direction: column; }
 </style>
 {% endblock %}
 
 {% block content %}
-
-<div class="form-card">
-    <h2 style="margin-top:0; border-bottom:2px solid #005a9c; padding-bottom:15px; margin-bottom:20px; color:#005a9c;">
-        {% if form.instance.pk %}Tétel Szerkesztése{% else %}Új Törzs Tétel{% endif %}
-    </h2>
+<div class="container">
+    <h1>{{ title }}</h1>
 
     <form method="POST">
         {% csrf_token %}
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div class="form-group"><label>Tételszám *</label>{{ form.tetelszam }}</div>
-            <div class="form-group"><label>Egység</label>{{ form.egyseg }}</div>
-        </div>
-
-        <div class="form-group"><label>Leírás *</label>{{ form.leiras }}</div>
-
-        <div class="form-group">
-            <label>Uniclass Besorolás (Szabvány)</label>
-
-            <div style="display:none;">{{ form.uniclass_item }}</div>
-
-            <div class="uniclass-wrapper">
+        <div class="form-grid">
+            <div class="full-width">
+                <label>Uniclass Besorolás</label>
+                <div style="display:none;">{{ form.uniclass_item }}</div>
                 <div class="uniclass-display" onclick="openUniclassModal()">
                     <span id="uniclass-text">
                         {% if form.instance.uniclass_item %}
                             {{ form.instance.uniclass_item.code }} - {{ form.instance.uniclass_item.title_en }}
                         {% else %}
-                            <span style="color:#888;">Kattints a kiválasztáshoz...</span>
+                            📂 Kattints a kiválasztáshoz...
                         {% endif %}
                     </span>
-                    <i class="fa-solid fa-chevron-down"></i>
                 </div>
-                <button type="button" class="btn" style="background:#ddd;" onclick="clearUniclass()" title="Törlés">✖</button>
             </div>
+            <div><label>Kód</label>{{ form.tetelszam }}</div>
+            <div><label>Egység</label>{{ form.egyseg }}</div>
+            <div class="full-width"><label>Megnevezés</label>{{ form.leiras }}</div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div class="form-group"><label>Normaidő (óra)</label>{{ form.normaido }}</div>
-            <div class="form-group"><label>Fix Anyagár (Ft)</label>{{ form.fix_anyag_ar }}</div>
-        </div>
+        <h3>🧱 Anyagok (Material)</h3>
+        {{ mat_formset.management_form }}
+        <table>
+            <thead><tr><th width="60%">Anyag</th><th width="20%">Mennyiség</th><th>Törlés</th></tr></thead>
+            <tbody>
+                {% for f in mat_formset %}
+                <tr>
+                    <td>{{ f.id }}{{ f.material }}</td> <td>{{ f.amount }}</td>
+                    <td>{{ f.DELETE }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-        <div class="form-group"><label>Szakma (Munkanem)</label>{{ form.munkanem }}</div>
+        <h3>👷 Munkadíj (Labor)</h3>
+        {{ lab_formset.management_form }}
+        <table>
+            <thead><tr><th width="60%">Művelet</th><th width="20%">Norma (óra)</th><th>Törlés</th></tr></thead>
+            <tbody>
+                {% for f in lab_formset %}
+                <tr>
+                    <td>{{ f.id }}{{ f.operation }}</td>
+                    <td>{{ f.time_required }}</td>
+                    <td>{{ f.DELETE }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-        <hr>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <a href="{% url 'master-item-list' %}" class="btn" style="background:#6c757d; color:white; text-decoration:none; padding:10px 20px; border-radius:4px;">Mégse</a>
-            <button type="submit" class="btn" style="background:#005a9c; color:white; border:none; padding:10px 20px; border-radius:4px; font-weight:bold; cursor:pointer;">💾 Mentés</button>
+        <h3>🚜 Gépek</h3>
+        {{ mach_formset.management_form }}
+        <table>
+            <thead><tr><th width="60%">Gép</th><th width="20%">Használat</th><th>Törlés</th></tr></thead>
+            <tbody>
+                {% for f in mach_formset %}
+                <tr>
+                    <td>{{ f.id }}{{ f.machine }}</td>
+                    <td>{{ f.amount }}</td>
+                    <td>{{ f.DELETE }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 30px; text-align: right;">
+            <button type="submit" class="btn btn-primary" style="padding: 15px 40px; font-size: 18px;">💾 MENTÉS</button>
         </div>
     </form>
 </div>
 
 <div id="uniclassModal" class="modal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3 style="margin:0;">🏗️ Uniclass Kereső</h3>
-            <span style="cursor:pointer; font-size:24px;" onclick="closeUniclassModal()">&times;</span>
-        </div>
-        <input type="text" id="tree-search" placeholder="Keresés kódra vagy névre..." />
-        <div class="modal-body">
-            <div id="uniclass_tree"></div>
-        </div>
+        <span style="text-align:right; cursor:pointer; font-size:24px;" onclick="closeUniclassModal()">&times;</span>
+        <h3>Uniclass Kereső</h3>
+        <input type="text" id="tree-search" placeholder="Keresés..." style="padding:10px; width:100%; border:1px solid #ddd; margin-bottom:10px;">
+        <div style="overflow-y: auto; flex-grow: 1;"><div id="uniclass_tree"></div></div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
-
 <script>
     var modal = document.getElementById("uniclassModal");
     var treeInitialized = false;
-
-    function openUniclassModal() {
-        modal.style.display = "block";
-        if (!treeInitialized) {
-            initTree();
-            treeInitialized = true;
-        }
-    }
-
-    function closeUniclassModal() {
-        modal.style.display = "none";
-    }
-
-    function clearUniclass() {
-        $('#id_uniclass_item').val(""); // Rejtett mező ürítése
-        $('#uniclass-text').html('<span style="color:#888;">Kattints a kiválasztáshoz...</span>');
-    }
-
+    function openUniclassModal() { modal.style.display = "block"; if(!treeInitialized){ initTree(); treeInitialized=true; } }
+    function closeUniclassModal() { modal.style.display = "none"; }
     function initTree() {
         $('#uniclass_tree').jstree({
-            'core': {
-                'data': {
-                    'url': "{% url 'uniclass-tree-data' %}", // Ez hívja a view-t
-                    'dataType': 'json'
-                },
-                'themes': { 'responsive': true }
-            },
-            'plugins': ["search", "types"],
-            'types': {
-                'default': { 'icon': 'fa fa-folder' }
-            }
+            'core': { 'data': { 'url': "{% url 'uniclass-tree-data' %}", 'dataType': 'json' } },
+            'plugins': ["search", "types"]
         });
-
-        // Keresés
-        var to = false;
-        $('#tree-search').keyup(function () {
-            if(to) { clearTimeout(to); }
-            to = setTimeout(function () {
-                var v = $('#tree-search').val();
-                $('#uniclass_tree').jstree(true).search(v);
-            }, 250);
-        });
-
-        // Kiválasztás eseménye
+        $('#tree-search').keyup(function () { var v = $('#tree-search').val(); $('#uniclass_tree').jstree(true).search(v); });
         $('#uniclass_tree').on("changed.jstree", function (e, data) {
             if(data.selected.length) {
                 var node = data.instance.get_node(data.selected[0]);
-
-                // Frissítjük a rejtett select mezőt
-                // A JSTree ID-ja most már megegyezik az adatbázis ID-val (lásd views.py)
-                var select = document.getElementById('id_uniclass_item');
-                select.value = node.id;
-
-                // Frissítjük a kijelzőt
+                document.getElementById('id_uniclass_item').value = node.id;
                 document.getElementById('uniclass-text').innerText = node.text;
-
                 closeUniclassModal();
             }
         });
     }
-
-    window.onclick = function(event) {
-        if (event.target == modal) closeUniclassModal();
-    }
+    window.onclick = function(event) { if (event.target == modal) closeUniclassModal(); }
 </script>
 {% endblock %}

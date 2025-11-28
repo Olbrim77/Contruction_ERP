@@ -1,4 +1,5 @@
 # projects/models.py
+
 from django.db import models
 from decimal import Decimal
 from django.utils import timezone
@@ -44,29 +45,26 @@ class Project(models.Model):
     class Meta: verbose_name = "Projekt"; verbose_name_plural = "Projektek"
 
 
-# --- ÚJ: UNICLASS 2015 STRUKTÚRA ---
+# --- UNICLASS 2015 ---
 class UniclassNode(models.Model):
-    """
-    Az Uniclass hierarchikus felépítése (Táblák -> Csoportok -> Termékek).
-    Példa: Pr_25_57_04 (Ceramic tiles)
-    """
-    code = models.CharField(max_length=20, unique=True, verbose_name="Uniclass Kód")  # Pl. Pr_25_57_04
+    code = models.CharField(max_length=20, unique=True, verbose_name="Uniclass Kód")
     title_en = models.CharField(max_length=255, verbose_name="Megnevezés (EN)")
     title_hu = models.CharField(max_length=255, verbose_name="Megnevezés (HU)", blank=True)
-    table = models.CharField(max_length=10, verbose_name="Tábla kód")  # Pl. Pr, Ef, Ss
 
-    # Hierarchia: Önmagára hivatkozik
+    description = models.TextField(blank=True, verbose_name="Leírás")
+    version = models.CharField(max_length=20, blank=True, verbose_name="Verzió")
+    date = models.CharField(max_length=20, blank=True, verbose_name="Dátum")
+    extra_data = models.TextField(blank=True, verbose_name="Egyéb adatok")
+
+    table = models.CharField(max_length=10, verbose_name="Tábla kód")
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children',
-                               verbose_name="Szülő kategória")
+                               verbose_name="Szülő")
 
     def __str__(self):
         label = self.title_hu if self.title_hu else self.title_en
         return f"{self.code} - {label}"
 
-    class Meta:
-        verbose_name = "Uniclass Kategória"
-        verbose_name_plural = "Uniclass Kategóriák"
-        ordering = ['code']
+    class Meta: verbose_name = "Uniclass Kategória"; verbose_name_plural = "Uniclass Kategóriák"; ordering = ['code']
 
 
 # --- TÖRZSADATOK ---
@@ -89,48 +87,96 @@ class Supplier(models.Model):
     def __str__(self): return self.name
 
 
+# --- RECEPTÚRA ÖSSZETEVŐK ---
 class Material(models.Model):
-    name = models.CharField(max_length=200, unique=True);
-    unit = models.CharField(max_length=20);
-    price = models.DecimalField(max_digits=12, decimal_places=2)
+    name = models.CharField(max_length=200, unique=True, verbose_name="Anyag neve")
+    unit = models.CharField(max_length=20, verbose_name="Egység")
+    price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Egységár")
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
+    uniclass_link = models.ForeignKey(UniclassNode, on_delete=models.SET_NULL, null=True, blank=True,
+                                      verbose_name="Uniclass (Pr)")
 
     def __str__(self): return f"{self.name} ({self.price} Ft)"
 
 
-class MasterItem(models.Model):
-    tetelszam = models.CharField(max_length=100, unique=True);
-    leiras = models.TextField();
-    egyseg = models.CharField(max_length=20)
-    normaido = models.DecimalField(max_digits=10, decimal_places=2, default=0);
-    fix_anyag_ar = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True)
+class Operation(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Művelet neve")
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Rezsióradíj")
+    uniclass_link = models.ForeignKey(UniclassNode, on_delete=models.SET_NULL, null=True, blank=True,
+                                      verbose_name="Uniclass (Ac)")
 
-    # ÚJ MEZŐ: Összekapcsolás az Uniclass-szal
+    def __str__(self): return f"{self.name} ({self.hourly_rate} Ft/ó)"
+
+
+class Machine(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Gép neve")
+    unit = models.CharField(max_length=20, default="óra", verbose_name="Egység")
+    price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Költség")
+    uniclass_link = models.ForeignKey(UniclassNode, on_delete=models.SET_NULL, null=True, blank=True,
+                                      verbose_name="Uniclass (Te)")
+
+    def __str__(self): return f"{self.name} ({self.price} Ft)"
+
+
+# --- MASTER ITEM (TÖRZS TÉTEL) ---
+class MasterItem(models.Model):
+    tetelszam = models.CharField(max_length=100, unique=True)
+    leiras = models.TextField()
+    egyseg = models.CharField(max_length=20)
+
+    fix_anyag_ar = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Anyag Össz.")
+    fix_munkadij = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Díj Össz.")
+    fix_gep_ar = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Gép Össz.")
+    normaido = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Norma (óra)")
+
+    munkanem = models.ForeignKey(Munkanem, on_delete=models.SET_NULL, null=True, blank=True)
     uniclass_item = models.ForeignKey(UniclassNode, on_delete=models.SET_NULL, null=True, blank=True,
                                       verbose_name="Uniclass Besorolás")
 
-    engy_kod = models.CharField(max_length=50, blank=True, null=True);
-    k_jelzo = models.CharField(max_length=50, blank=True, null=True);
+    engy_kod = models.CharField(max_length=50, blank=True, null=True)
+    k_jelzo = models.CharField(max_length=50, blank=True, null=True)
     cpr_kod = models.CharField(max_length=50, blank=True, null=True)
 
+    def calculate_totals(self):
+        self.fix_anyag_ar = sum(c.amount * c.material.price for c in self.material_components.all())
+        self.fix_munkadij = sum(c.time_required * c.operation.hourly_rate for c in self.labor_components.all())
+        self.normaido = sum(c.time_required for c in self.labor_components.all())
+        self.fix_gep_ar = sum(c.amount * c.machine.price for c in self.machine_components.all())
+        self.save()
+
     @property
-    def calculated_material_cost(self):
-        comps = self.components.all();
-        return sum(c.amount * c.material.price for c in comps) if comps.exists() else self.fix_anyag_ar
+    def total_price(self):
+        """ EZ HIÁNYZOTT! """
+        return self.fix_anyag_ar + self.fix_munkadij + self.fix_gep_ar
+
+    @property
+    def calculated_material_cost(self): return self.fix_anyag_ar
 
     def __str__(self): return self.tetelszam
 
     class Meta: verbose_name = "Törzs Tétel"; verbose_name_plural = "Törzs Tételek"
 
 
+# --- RECEPTÚRA KAPCSOLÓK ---
 class ItemComponent(models.Model):
-    master_item = models.ForeignKey(MasterItem, related_name='components', on_delete=models.CASCADE)
+    master_item = models.ForeignKey(MasterItem, related_name='material_components', on_delete=models.CASCADE)
     material = models.ForeignKey(Material, on_delete=models.CASCADE);
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
 
-# --- TÉTELSOR ---
+class LaborComponent(models.Model):
+    master_item = models.ForeignKey(MasterItem, related_name='labor_components', on_delete=models.CASCADE)
+    operation = models.ForeignKey(Operation, on_delete=models.CASCADE);
+    time_required = models.DecimalField(max_digits=10, decimal_places=2)
+
+
+class MachineComponent(models.Model):
+    master_item = models.ForeignKey(MasterItem, related_name='machine_components', on_delete=models.CASCADE)
+    machine = models.ForeignKey(Machine, on_delete=models.CASCADE);
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+
+# --- TÉTELSOR (PROJEKT TÉTEL) ---
 class Tetelsor(models.Model):
     project = models.ForeignKey(Project, related_name='tetelsorok', on_delete=models.CASCADE)
     master_item = models.ForeignKey(MasterItem, on_delete=models.PROTECT)
@@ -156,7 +202,6 @@ class Tetelsor(models.Model):
     sajat_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0);
     alv_munkadij_osszesen = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    # GANTT MEZŐK
     gantt_start_date = models.DateField(null=True, blank=True, verbose_name="Tervezett Kezdés")
     gantt_duration = models.IntegerField(default=1, verbose_name="Időtartam (nap)")
     felelos = models.CharField(max_length=100, blank=True, verbose_name="Felelős")
@@ -202,6 +247,7 @@ class Tetelsor(models.Model):
 
 
 # --- EGYÉB MODELLEK ---
+
 class Task(models.Model):
     STATUS_CHOICES = [('FUGGO', 'Függőben'), ('KESZ', 'Kész')]
     project = models.ForeignKey(Project, on_delete=models.CASCADE);

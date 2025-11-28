@@ -1,79 +1,83 @@
+{% extends 'projects/base.html' %}
 {% load humanize %}
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8">
-    <title>Receptúra Szerkesztése</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; background-color: #f4f6f9; }
-        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { color: #6f42c1; margin-top: 0; }
-        .item-info { background: #f8f9fa; padding: 15px; border-left: 4px solid #6f42c1; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background-color: #f1f1f1; }
-        .numeric { text-align: right; }
 
-        .add-form { background: #eef2f7; padding: 15px; border-radius: 5px; display: flex; gap: 10px; align-items: flex-end; }
-        .form-group { flex: 1; }
-        label { display: block; font-weight: bold; font-size: 0.9em; margin-bottom: 5px; }
-        select, input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-back { display: inline-block; margin-bottom: 20px; text-decoration: none; color: #555; }
-        .delete-btn { color: red; text-decoration: none; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <a href="{% url 'master-item-list' %}" class="btn-back">&laquo; Vissza a Katalógushoz</a>
+{% block title %}Receptúra Szerkesztése{% endblock %}
 
-        <h1>Receptúra Szerkesztése</h1>
+{% block extra_css %}
+<style>
+    .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; }
+    .item-info { background: #f0f4f8; padding: 20px; border-left: 5px solid #005a9c; margin-bottom: 30px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+    th { background: #f8f9fa; }
+    .add-form { background: #eef2f7; padding: 15px; display: flex; gap: 10px; align-items: flex-end; margin-bottom: 30px; border-radius: 4px; }
+    .add-form select, .add-form input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn-add { background: #28a745; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+</style>
+{% endblock %}
 
-        <div class="item-info">
-            <h3>{{ master_item.tetelszam }}</h3>
-            <p>{{ master_item.leiras }}</p>
-            <p><strong>Jelenlegi kalkulált ár:</strong> {{ master_item.fix_anyag_ar|floatformat:0|intcomma }} Ft / {{ master_item.egyseg }}</p>
+{% block content %}
+<div class="container">
+    <a href="{% url 'master-item-list' %}">&laquo; Vissza</a>
+    <h1>Receptúra Szerkesztése</h1>
+
+    <div class="item-info">
+        <h2>{{ master_item.tetelszam }}</h2>
+        <p>{{ master_item.leiras }}</p>
+        <hr>
+        <div style="display:flex; gap:20px;">
+            <span>Anyag: <strong>{{ master_item.fix_anyag_ar|floatformat:0|intcomma }} Ft</strong></span>
+            <span>Díj: <strong>{{ master_item.fix_munkadij|floatformat:0|intcomma }} Ft</strong></span>
+            <span>Gép: <strong>{{ master_item.fix_gep_ar|floatformat:0|intcomma }} Ft</strong></span>
         </div>
-
-        <h3>Szükséges Anyagok (1 {{ master_item.egyseg }}-hez)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Anyag Neve</th>
-                    <th>Egységár</th>
-                    <th>Mennyiség</th>
-                    <th>Részösszeg</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for comp in components %}
-                <tr>
-                    <td>{{ comp.material.name }}</td>
-                    <td class="numeric">{{ comp.material.price|floatformat:0 }} Ft</td>
-                    <td class="numeric">x {{ comp.amount }} {{ comp.material.unit }}</td>
-                    <td class="numeric"><strong>{% widthratio comp.material.price 1 comp.amount %} Ft</strong></td>
-                    <td style="text-align: center;"><a href="{% url 'master-item-component-delete' comp.id %}" class="delete-btn">✖</a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" style="text-align: center; color: #777;">Nincs anyag hozzárendelve.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <h3>Anyag Hozzáadása</h3>
-        <form method="POST" class="add-form">
-            {% csrf_token %}
-            <div class="form-group">
-                <label>Anyag kiválasztása</label>
-                {{ form.material }}
-            </div>
-            <div class="form-group" style="max-width: 150px;">
-                <label>Mennyiség</label>
-                {{ form.amount }}
-            </div>
-            <button type="submit">+ Hozzáadás</button>
-        </form>
     </div>
-</body>
-</html>
+
+    <h3>🧱 Anyagok</h3>
+    <table>
+        <thead><tr><th>Megnevezés</th><th>Egységár</th><th>Mennyiség</th><th>Törlés</th></tr></thead>
+        <tbody>
+            {% for c in materials %}
+            <tr><td>{{ c.material }}</td><td>{{ c.material.price }}</td><td>{{ c.amount }}</td><td><a href="{% url 'master-item-component-delete' c.id %}" style="color:red;">X</a></td></tr>
+            {% empty %}<tr><td colspan="4" style="color:#999; text-align:center;">Nincs anyag.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    <form method="POST" class="add-form">
+        {% csrf_token %}
+        <div style="flex:3">{{ mat_form.material }}</div>
+        <div style="flex:1">{{ mat_form.amount }}</div>
+        <button type="submit" name="submit_mat" class="btn-add">+ Anyag</button>
+    </form>
+
+    <h3>👷 Munkadíj</h3>
+    <table>
+        <thead><tr><th>Művelet</th><th>Óradíj</th><th>Norma (óra)</th><th>Törlés</th></tr></thead>
+        <tbody>
+            {% for c in labor %}
+            <tr><td>{{ c.operation }}</td><td>{{ c.operation.hourly_rate }}</td><td>{{ c.time_required }}</td><td><a href="{% url 'master-item-component-delete' c.id %}" style="color:red;">X</a></td></tr>
+            {% empty %}<tr><td colspan="4" style="color:#999; text-align:center;">Nincs munka.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    <form method="POST" class="add-form">
+        {% csrf_token %}
+        <div style="flex:3">{{ lab_form.operation }}</div>
+        <div style="flex:1">{{ lab_form.time_required }}</div>
+        <button type="submit" name="submit_lab" class="btn-add">+ Munka</button>
+    </form>
+
+    <h3>🚜 Gépek</h3>
+    <table>
+        <thead><tr><th>Gép</th><th>Költség</th><th>Használat</th><th>Törlés</th></tr></thead>
+        <tbody>
+            {% for c in machines %}
+            <tr><td>{{ c.machine }}</td><td>{{ c.machine.price }}</td><td>{{ c.amount }}</td><td><a href="{% url 'master-item-component-delete' c.id %}" style="color:red;">X</a></td></tr>
+            {% empty %}<tr><td colspan="4" style="color:#999; text-align:center;">Nincs gép.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    <form method="POST" class="add-form">
+        {% csrf_token %}
+        <div style="flex:3">{{ mach_form.machine }}</div>
+        <div style="flex:1">{{ mach_form.amount }}</div>
+        <button type="submit" name="submit_mach" class="btn-add">+ Gép</button>
+    </form>
+</div>
+{% endblock %}

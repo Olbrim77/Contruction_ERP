@@ -1,14 +1,13 @@
 # projects/management/commands/import_uniclass.py
 
 from django.core.management.base import BaseCommand
-from django.db import transaction  # <--- EZ AZ ÚJ VARÁZSSZÓ
 from projects.models import UniclassNode
 import openpyxl
 import os
 
 
 class Command(BaseCommand):
-    help = 'Uniclass 2015 Excel táblázatok importálása (Gyorsított)'
+    help = 'Uniclass 2015 Excel táblázatok importálása (A-N oszlopok, Biztonságos Bulk mód)'
 
     def add_arguments(self, parser):
         parser.add_argument('file_path', type=str, help='Az Excel fájl elérési útja')
@@ -23,74 +22,123 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(f'--- Importálás indítása: {table_code} tábla ---')
-        self.stdout.write('Excel betöltése... (ez eltarthat pár másodpercig)')
+        self.stdout.write('Excel beolvasása (A-N oszlopok)...')
 
         try:
-            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)  # read_only gyorsabb
+            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
             sheet = wb.active
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Hiba: {e}'))
+            self.stdout.write(self.style.ERROR(f'Hiba az Excel megnyitásakor: {e}'))
             return
 
-        rows = list(sheet.iter_rows(min_row=2, values_only=True))
-        # Rendezés, hogy a szülők előbb legyenek (kód szerint növekvő)
-        rows.sort(key=lambda x: x[0] if x[0] else "")
+        excel_rows = []
+        for row in sheet.iter_rows(min_row=2, max_col=14, values_only=True):
+            if row[0]:
+                cleaned_row = [str(cell).strip() if cell is not None else "" for cell in row]
+                excel_rows.append(cleaned_row)
 
-        total_rows = len(rows)
-        self.stdout.write(f'{total_rows} sor feldolgozása egyben...')
+        self.stdout.write(f'{len(excel_rows)} sor beolvasva. Adatbázis ellenőrzése...')
 
-        # CACHE: Memóriában tároljuk a már létrehozott szülőket, hogy ne kelljen mindig az DB-hez fordulni
-        # Ez hatalmasat gyorsít!
-        parent_cache = {}
+        # 1. LÉPÉS: MINDEN LÉTEZŐ ELEM LEKÉRÉSE (JAVÍTÁS: Nincs szűrés táblára!)
+        # Így elkerüljük a Unique Constraint hibát, ha a kód már létezik más tábla alatt
+        existing_nodes = {node.code: node for node in UniclassNode.objects.all()}
 
-        # Előtöltjük a cache-t a már létező elemekkel (ha újra importálsz)
-        existing_nodes = UniclassNode.objects.filter(table=table_code).values('code', 'id')
-        for node in existing_nodes:
-            parent_cache[node['code']] = node['id']
+        new_objects = []
+        update_objects = []
 
-        created_count = 0
+        # Segédhalmaz a duplikációk kiszűrésére az Excelen belül
+        processed_codes_in_this_run = set()
 
-        # --- TRANZAKCIÓ INDÍTÁSA ---
-        # Ez blokkolja az írást a végéig, így villámgyors lesz
-        try:
-            with transaction.atomic():
-                for row in rows:
-                    code_raw = row[0]
-                    title = row[1]
+        # 2. LÉPÉS: ADATOK FELDOLGOZÁSA
+        for row in excel_rows:
+            code = row[0]  # A oszlop: Kód
 
-                    if not code_raw: continue
-                    code = code_raw.strip()
+            # Ha az Excelben kétszer szerepel ugyanaz a kód, a másodikat átugorjuk
+            if code in processed_codes_in_this_run:
+                continue
+            processed_codes_in_this_run.add(code)
 
-                    # Szülő keresése a CACHE-ből (nem DB-ből!)
-                    parts = code.split('_')
-                    parent_id = None
+            # CÍM (Title): G oszlop (index 6) az elsődleges, tartalék a B (index 1)
+            title = row[6] if row[6] else row[1]
 
-                    if len(parts) > 1:
-                        parent_code = "_".join(parts[:-1])
-                        parent_id = parent_cache.get(parent_code)  # O(1) gyorsaságú keresés
+            desc = row[2]  # C: Leírás
+            version = row[3]  # D: Verzió
+            date = row[4]  # E: Dátum
 
-                    # Létrehozás
-                    # update_or_create helyett create-et használunk vagy get_or_create-et
-                    # A gyorsaság miatt most feltételezzük, hogy inkább frissítünk/létrehozunk
-                    obj, created = UniclassNode.objects.update_or_create(
-                        code=code,
-                        defaults={
-                            'title_en': title,
-                            'table': table_code,
-                            'parent_id': parent_id  # Közvetlenül ID-t adunk át
-                        }
-                    )
+            # Extrák (kivéve G)
+            extras = " | ".join([r for i, r in enumerate(row[5:]) if r and i != 1])
 
-                    # Betesszük az új elemet is a cache-be, hogy a gyerekei megtalálják
-                    parent_cache[code] = obj.id
+            if code in existing_nodes:
+                # FRISSÍTÉS
+                node = existing_nodes[code]
+                changed = False
 
-                    if created: created_count += 1
+                # Ha még nincs mentve (mert most hoztuk létre ebben a futásban), akkor a memóriában frissítjük
+                # Ha már van ID-ja (adatbázisban volt), akkor update listába tesszük
 
-                    if created_count % 1000 == 0:
-                        self.stdout.write(f'... {created_count} új elem feldolgozva')
+                if node.title_en != title: node.title_en = title; changed = True
+                if node.description != desc: node.description = desc; changed = True
+                if node.version != version: node.version = version; changed = True
+                if node.date != date: node.date = date; changed = True
+                if node.extra_data != extras: node.extra_data = extras; changed = True
 
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Hiba történt mentés közben: {e}'))
-            return
+                # Csak akkor adjuk hozzá a bulk_update-hez, ha már létezik az DB-ben (van PK)
+                if changed and node.pk:
+                    update_objects.append(node)
+            else:
+                # LÉTREHOZÁS
+                new_node = UniclassNode(
+                    code=code,
+                    title_en=title,
+                    description=desc,
+                    version=version,
+                    date=date,
+                    extra_data=extras,
+                    table=table_code,
+                    parent=None
+                )
+                new_objects.append(new_node)
+                existing_nodes[code] = new_node  # Memóriába is betesszük
 
-        self.stdout.write(self.style.SUCCESS(f'KÉSZ! Feldolgozva. Összes elem az adatbázisban: {len(parent_cache)}'))
+        # ADATBÁZIS MŰVELETEK
+        if new_objects:
+            self.stdout.write(f'{len(new_objects)} új elem mentése...')
+            UniclassNode.objects.bulk_create(new_objects, batch_size=2000)
+
+        if update_objects:
+            # Egyedivé tesszük a listát (ha véletlenül többször került volna bele ugyanaz az objektum)
+            unique_updates = list({obj.code: obj for obj in update_objects}.values())
+            self.stdout.write(f'{len(unique_updates)} elem frissítése...')
+            if unique_updates:
+                UniclassNode.objects.bulk_update(unique_updates,
+                                                 ['title_en', 'description', 'version', 'date', 'extra_data'],
+                                                 batch_size=2000)
+
+        # 3. LÉPÉS: HIERARCHIA (SZÜLŐK) ÉPÍTÉSE
+        self.stdout.write('Hierarchia kapcsolatok építése...')
+
+        # Újratöltjük a térképet, hogy a most létrehozottaknak is legyen ID-ja
+        # Itt is mindenkit lekérünk, nem csak a táblát
+        all_nodes_map = {node.code: node for node in UniclassNode.objects.all()}
+        parent_updates = []
+
+        for code in processed_codes_in_this_run:
+            current_node = all_nodes_map.get(code)
+            if not current_node: continue
+
+            parts = code.split('_')
+            parent_node = None
+
+            if len(parts) > 1:
+                parent_code = "_".join(parts[:-1])
+                parent_node = all_nodes_map.get(parent_code)
+
+            if current_node.parent_id != (parent_node.id if parent_node else None):
+                current_node.parent = parent_node
+                parent_updates.append(current_node)
+
+        if parent_updates:
+            self.stdout.write(f'{len(parent_updates)} szülő-kapcsolat beállítása...')
+            UniclassNode.objects.bulk_update(parent_updates, ['parent'], batch_size=2000)
+
+        self.stdout.write(self.style.SUCCESS(f'KÉSZ! Importálás sikeres.'))
