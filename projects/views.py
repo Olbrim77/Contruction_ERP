@@ -708,9 +708,52 @@ def material_order_delete(request, pk):
     return render(request, 'projects/document_confirm_delete.html', {'document': order})
 
 
-def material_order_create_from_budget(request, project_id): return material_order_create(request, project_id)
+def material_order_create_from_budget(request, project_id):
+    """
+    Rendelés generálás a meglévő költségvetés tételeiből.
+    """
+    project = get_object_or_404(Project, id=project_id)
 
+    # Csak azokat a tételeket listázzuk, ahol van anyagköltség (anyag_egysegar > 0)
+    tasks = project.tetelsorok.filter(anyag_egysegar__gt=0).order_by('sorszam')
 
+    if request.method == 'POST':
+        ids = request.POST.getlist('selected_items')  # A bepipált sorok ID-jai
+
+        if ids:
+            # 1. Létrehozunk egy új rendelést (Tervezet státusszal)
+            order = MaterialOrder.objects.create(
+                project=project,
+                status='TERVEZET',
+                notes="Költségvetésből generálva"
+            )
+
+            # 2. Átmásoljuk a kiválasztott tételeket
+            count = 0
+            for tid in ids:
+                try:
+                    t = Tetelsor.objects.get(id=tid)
+                    OrderItem.objects.create(
+                        order=order,
+                        name=t.leiras,
+                        quantity=t.mennyiseg,
+                        unit=t.egyseg,
+                        price=t.anyag_egysegar
+                    )
+                    count += 1
+                except Tetelsor.DoesNotExist:
+                    continue
+
+            messages.success(request, f"{count} tétel hozzáadva az új rendeléshez!")
+            # Átirányítás a rendelés szerkesztésére (ahol véglegesítheted)
+            return redirect('material-order-update', pk=order.id)
+        else:
+            messages.warning(request, "Nem választottál ki egyetlen tételt sem!")
+
+    return render(request, 'projects/material_order_from_budget.html', {
+        'project': project,
+        'tasks': tasks
+    })
 def material_order_print(request, pk):
     order = get_object_or_404(MaterialOrder, id=pk);
     total_value = sum(item.total_price for item in order.items.all())
