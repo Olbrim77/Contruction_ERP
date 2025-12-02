@@ -1,80 +1,185 @@
-{% load humanize %}
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8">
-    <title>Tétel Hozzáadása Törzsből</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; background-color: #f4f6f9; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        h1 { color: #333; margin: 0; }
-        .filter-bar { background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 10px; margin-bottom: 20px; }
-        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        .search-input { flex-grow: 1; }
-        .btn { padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; color: white; }
-        .btn-primary { background-color: #005a9c; } .btn-back { background-color: #6c757d; }
+{% extends 'projects/base.html' %}
 
-        /* KIVÁLASZTÁS GOMB */
-        .btn-select { background-color: #28a745; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
-        .btn-select:hover { background-color: #218838; }
+{% block title %}Tétel Hozzáadása Törzsből{% endblock %}
 
-        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #f8f9fa; color: #555; font-weight: bold; }
-        tr:hover { background-color: #f1f1f1; }
-        .numeric { text-align: right; font-family: monospace; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>➕ Tétel hozzáadása Törzsből</h1>
-        <div>
-            <a href="{% url 'project-detail' project.id %}" class="btn btn-back">Mégse</a>
+{% block breadcrumbs %}
+    <a href="{% url 'project-detail' project.id %}#budget">{{ project.name }}</a> / <span>Tétel hozzáadása</span>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Fő konténer */
+    .container {
+        max-width: 1200px;
+        margin: 20px auto;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        padding: 25px;
+        border: 1px solid #ddd;
+    }
+
+    /* --- 1. FELSŐ SZEKCIÓ (FIX) --- */
+    .header-section {
+        margin-bottom: 20px;
+    }
+
+    /* Cím és Gomb sora */
+    .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 15px;
+    }
+
+    h2 { margin: 0; color: #005a9c; }
+    .project-label { color: #666; font-size: 0.9em; }
+
+    /* Szűrő sáv */
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        border: 1px solid #e1e4e8;
+    }
+    .filter-form input, .filter-form select {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    .filter-input { flex-grow: 1; min-width: 200px; }
+
+    .btn-filter {
+        background-color: #005a9c; color: white; border: none;
+        padding: 9px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;
+    }
+    .btn-filter:hover { background-color: #00447c; }
+
+    /* --- 2. A GÖRGETHETŐ DOBOZ (A LÉNYEG!) --- */
+    .scrollable-table-wrapper {
+        /* Fix magasságot adunk neki, hogy görögjön */
+        height: 600px;
+        overflow-y: auto; /* Csak függőlegesen görgethető */
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: #fff;
+        position: relative; /* A sticky headerhez kell */
+    }
+
+    /* TÁBLÁZAT */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    /* RAGADÓS FEJLÉC (Sticky Header) */
+    thead th {
+        position: sticky;
+        top: 0;
+        background-color: #e9ecef; /* Szürke háttér, hogy takarja a szöveget */
+        z-index: 10;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid #bbb;
+        color: #333;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
+    }
+
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    tr:hover { background-color: #f0f8ff; }
+
+    /* EGYÉB GOMBOK */
+    .btn-back {
+        background-color: #6c757d; color: white; text-decoration: none;
+        padding: 8px 20px; border-radius: 4px; font-weight: bold; font-size: 14px;
+    }
+    .btn-back:hover { background-color: #5a6268; }
+
+    .btn-select {
+        background-color: #28a745; color: white; text-decoration: none;
+        padding: 6px 12px; border-radius: 4px; font-weight: bold; display: inline-block; font-size: 12px;
+    }
+    .btn-select:hover { background-color: #218838; }
+
+    .code-col { font-family: monospace; font-weight: bold; color: #005a9c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="header-section">
+        <div class="header-top">
+            <div>
+                <h2>📥 Tétel Kiválasztása Törzsből</h2>
+                <span class="project-label">Projekt: <strong>{{ project.name }}</strong></span>
+            </div>
+            <a href="{% url 'project-detail' project.id %}#budget" class="btn-back">✖ Mégse</a>
         </div>
+
+        <form method="GET" class="filter-form">
+            <input type="text" name="q" class="filter-input" placeholder="Keresés kód vagy név alapján..." value="{{ search_query }}">
+
+            <select name="munkanem">
+                <option value="">-- Minden Szakma --</option>
+                {% for m in munkanemek %}
+                    <option value="{{ m.id }}" {% if current_munkanem == m.id %}selected{% endif %}>{{ m.nev }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn-filter">Szűrés</button>
+            {% if search_query or current_munkanem %}
+                <a href="{% url 'tetelsor-create-master-step1' project.id %}" style="color: #dc3545; font-weight: bold; margin-left: 10px; text-decoration:none;">Szűrő törlése</a>
+            {% endif %}
+        </form>
     </div>
 
-    <form method="GET" class="filter-bar">
-        <input type="text" name="q" class="search-input" placeholder="Keresés név vagy kód alapján..." value="{{ search_query }}">
+    <div class="scrollable-table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">Kód</th>
+                    <th style="width: 40%;">Megnevezés</th>
+                    <th style="width: 8%;">Egység</th>
+                    <th style="width: 10%;">Norma</th>
+                    <th style="width: 12%; text-align: right;">Anyagár</th>
+                    <th style="width: 15%; text-align: center;">Művelet</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="code-col">{{ item.tetelszam }}</td>
+                    <td>{{ item.leiras }}</td>
+                    <td>{{ item.egyseg }}</td>
+                    <td>{{ item.normaido }} óra</td>
+                    <td style="text-align: right;">{{ item.fix_anyag_ar|floatformat:0 }} Ft</td>
+                    <td style="text-align: center;">
+                        <a href="{% url 'tetelsor-create-master-step2' project.id item.id %}" class="btn-select">
+                            Kiválasztás ➡️
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 60px; color: #888;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">📭</div>
+                        <p style="font-size: 1.2em; margin-bottom: 5px;">Nincs találat.</p>
+                        <p>Próbálj meg más kulcsszót, vagy töröld a szűrőket.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-        <select name="munkanem" onchange="this.form.submit()">
-            <option value="">-- Minden Munkanem --</option>
-            {% for m in munkanemek %}
-                <option value="{{ m.id }}" {% if current_munkanem == m.id %}selected{% endif %}>{{ m.nev }}</option>
-            {% endfor %}
-        </select>
-
-        <button type="submit" class="btn btn-primary">Keresés</button>
-    </form>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Kód</th>
-                <th>Leírás</th>
-                <th>Egység</th>
-                <th>Munkanem</th>
-                <th>Ár</th>
-                <th>Művelet</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in items %}
-            <tr>
-                <td><strong>{{ item.tetelszam }}</strong></td>
-                <td>{{ item.leiras|truncatechars:60 }}</td>
-                <td>{{ item.egyseg }}</td>
-                <td>{{ item.munkanem|default:"-" }}</td>
-                <td class="numeric">{{ item.fix_anyag_ar|floatformat:0|intcomma }}</td>
-                <td>
-                    <a href="{% url 'tetelsor-create-master-step2' project.id item.id %}" class="btn-select">
-                        Kiválasztás »
-                    </a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" style="text-align: center; padding: 20px;">Nincs találat.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</body>
-</html>
+</div>
+{% endblock %}

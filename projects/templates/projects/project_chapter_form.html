@@ -1,0 +1,21 @@
+{% extends 'projects/base.html' %}
+{% block title %}Új Fejezet{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 50px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+    <h2 style="color: #005a9c; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+        📂 Új Fejezet Létrehozása
+    </h2>
+    <p>Projekt: <strong>{{ project.name }}</strong></p>
+
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <div style="margin-top: 30px; text-align: right;">
+            <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary" style="text-decoration: none; margin-right: 10px;">Mégse</a>
+            <button type="submit" class="btn btn-primary" style="background: #005a9c; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Mentés</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

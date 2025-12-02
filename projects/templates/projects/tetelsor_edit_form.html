@@ -3,7 +3,7 @@
 {% block title %}Tétel Szerkesztése{% endblock %}
 
 {% block breadcrumbs %}
-    <a href="{% url 'project-detail' project.id %}">{{ project.name }}</a> / <span>Tétel</span>
+    <a href="{% url 'project-detail' project.id %}#budget">{{ project.name }}</a> / <span>Tétel</span>
 {% endblock %}
 
 {% block extra_css %}
@@ -14,85 +14,106 @@
 
     h3 { margin-top: 0; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
     label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; font-size: 0.9em; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; }
 
-    .row { display: flex; gap: 15px; }
-    .col { flex: 1; }
+    .btn { padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: 600; border: none; text-decoration: none; display: inline-block; }
+    .btn-primary { background: #005a9c; color: white; }
+    .btn-primary:hover { background: #00447c; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-secondary:hover { background: #545b62; }
+
+    .helper-text { font-size: 0.85em; color: #666; margin-top: 5px; }
 </style>
 {% endblock %}
 
 {% block content %}
+
 <form method="POST">
     {% csrf_token %}
 
     <div class="form-grid">
+
         <div class="main-card">
-            <h3>✏️ Tétel Adatai</h3>
+            <h3>Tétel Alapadatok</h3>
 
-            <label>Tétel Leírása</label>
-            {{ form.leiras }}
+            <div style="margin-bottom: 15px;">
+                <label>Fejezet</label>
+                {{ form.chapter }}
+            </div>
 
-            <div class="row">
-                <div class="col">
-                    <label>Mennyiség</label>
+            <div style="margin-bottom: 15px;">
+                <label>Megnevezés / Leírás *</label>
+                {{ form.leiras }}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label>Mennyiség *</label>
                     {{ form.mennyiseg }}
                 </div>
-                <div class="col">
-                    <label>Egység</label>
+                <div>
+                    <label>Egység (pl. m2)</label>
                     {{ form.egyseg }}
                 </div>
-            </div>
-
-            <div class="row">
-                <div class="col">
-                    <label>Norma (óra/egység)</label>
+                <div>
+                    <label>Normaidő (óra/egység)</label>
                     {{ form.normaido }}
                 </div>
-                <div class="col">
-                    <label>Anyagár (Ft/egység)</label>
-                    {{ form.anyag_egysegar }}
-                </div>
             </div>
 
-            <label>Megjegyzés</label>
-            {{ form.megjegyzes }}
+            <div style="margin-bottom: 15px;">
+                <label>Anyag Egységár (Ft)</label>
+                {{ form.anyag_egysegar }}
+            </div>
 
-            <div style="margin-top: 20px; text-align: right;">
-                <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Mégse</a>
-                <button type="submit" class="btn btn-success">{{ submit_label|default:"Mentés" }}</button>
+            <div style="margin-bottom: 15px;">
+                <label>Megjegyzés</label>
+                {{ form.megjegyzes }}
+            </div>
+
+            <div style="margin-top: 30px; display: flex; justify-content: flex-end; gap: 10px;">
+                <a href="{% url 'project-detail' project.id %}#budget" class="btn btn-secondary">Mégse</a>
+                <button type="submit" class="btn btn-primary">{{ submit_label|default:"Mentés" }}</button>
             </div>
         </div>
 
         <div class="side-card">
-            <h3>⚙️ Beállítások</h3>
+            <h3>Beállítások</h3>
 
-            <label>Munkanem</label>
+            <label>Szakma (Munkanem)</label>
             {{ form.munkanem }}
+
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ddd;">
 
             <label>Alvállalkozó</label>
             {{ form.alvallalkozo }}
 
-            <label>Központi Anyag (Opcionális)</label>
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ddd;">
+
+            <label>Központi Anyag (Törzs)</label>
             {{ form.material }}
 
-            <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ddd;">
 
-            <h4>Előrehaladás</h4>
-            <label>Készültség (%)</label>
+            <label>Elkészültség (%)</label>
             {{ form.progress_percentage }}
 
-            <label>Saját munka aránya (%)</label>
+            <label>Saját munka arány (%)</label>
             {{ form.labor_split_percentage }}
+            <div class="helper-text">100% = Csak saját, 0% = Csak alvállalkozó</div>
 
-            <hr style="border:0; border-top:1px solid #ddd; margin: 15px 0;">
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ddd;">
 
-            <h4>Kódok</h4>
-            <div class="row">
-                <div class="col"><label>ENGY</label>{{ form.engy_kod }}</div>
-                <div class="col"><label>K-Jel</label>{{ form.k_jelzo }}</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><label>ENGY Kód</label>{{ form.engy_kod }}</div>
+                <div><label>K Jelző</label>{{ form.k_jelzo }}</div>
             </div>
-            <label>CPR Kód</label>{{ form.cpr_kod }}
+            <div style="margin-top: 10px;">
+                <label>CPR Kód</label>{{ form.cpr_kod }}
+            </div>
         </div>
     </div>
 </form>
+
 {% endblock %}

@@ -1,47 +1,85 @@
 {% extends 'projects/base.html' %}
-
-{% block title %}Napi Jelentés{% endblock %}
-
-{% block breadcrumbs %}
-    <a href="{% url 'project-detail' project.id %}">{{ project.name }}</a> / <span>Napi Jelentés</span>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .form-card { background: #fff; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; }
-    label { display: block; font-weight: bold; margin-bottom: 5px; margin-top: 15px; color: #444; }
-    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-    .save-btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 18px; margin-top: 30px; cursor: pointer; }
-    .inventory-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
-    .inventory-table td { padding: 10px 0; border-bottom: 1px solid #eee; }
-</style>
-{% endblock %}
-
+{% load humanize %}
+{% block title %}Napló Bejegyzés{% endblock %}
 {% block content %}
-<div class="form-card">
-    <h2 style="margin-top:0;">📋 Napi Jelentés</h2>
-    <form method="POST">
+<div style="max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px;">
+    <h2 style="color: #005a9c;">
+        {% if log_entry %}Napló Szerkesztése{% else %}Új Napló Bejegyzés{% endif %}
+    </h2>
+    <p><strong>Projekt:</strong> {{ project.name }}</p>
+
+    {% if form.errors or img_formset.errors or mat_formset.errors %}
+        <div style="background-color: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 15px;">
+            <strong>Hiba történt! Ellenőrizd a mezőket.</strong>
+            {{ form.errors }} {{ img_formset.errors }} {{ mat_formset.errors }}
+        </div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data">
         {% csrf_token %}
-        <label>Dátum</label>{{ form.date }}
-        <label>Időjárás</label>{{ form.weather }}
-        <label>Létszám (fő)</label>{{ form.workforce }}
-        <label>Elvégzett munka</label>{{ form.work_done }}
-        <label>Problémák</label>{{ form.problems }}
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div><label>Dátum</label>{{ form.date }}</div>
+            <div><label>Időjárás</label>{{ form.weather }}</div>
+        </div>
+        <div style="margin-top: 15px;"><label>Létszám</label>{{ form.workforce }}</div>
+        <div style="margin-top: 15px;"><label>Munka</label>{{ form.work_done }}</div>
+        <div style="margin-top: 15px;"><label>Problémák</label>{{ form.problems }}</div>
 
         <hr style="margin: 30px 0;">
-        <h3 style="font-size:16px;">Anyagfelhasználás (Raktárból)</h3>
-        {{ formset.management_form }}
-        <table class="inventory-table">
-            {% for f in formset %}
-            <tr>
-                <td>{{ f.inventory_item }}</td>
-                <td width="80px">{{ f.quantity }}</td>
-                <td width="30px">{{ f.DELETE }}</td>
-            </tr>
-            {% endfor %}
+
+        <h3 style="color:#005a9c;">📷 Fotók Csatolása</h3>
+        <p style="color:#666; font-size:0.9em;">Tölts fel képeket egyesével a lenti mezőkben.</p>
+
+        {{ img_formset.management_form }}
+
+        <table style="width:100%; border-collapse: collapse;">
+            <tbody>
+                {% for form in img_formset %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding:10px;">
+                        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+                        {{ form.image }}
+
+                        {% if form.instance.pk and form.instance.image %}
+                            <br>
+                            <a href="{{ form.instance.image.url }}" target="_blank" style="color:blue; font-size:0.9em;">
+                                Megtekintés
+                            </a>
+                        {% endif %}
+                    </td>
+                    <td style="padding:10px; text-align: right;">
+                        {% if form.instance.pk %}
+                            <label style="color:red;">{{ form.DELETE }} Törlés</label>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
-        <button type="submit" class="save-btn">Mentés</button>
-        <a href="{% url 'project-detail' project.id %}" style="display:block; text-align:center; margin-top:20px;">Mégse</a>
+
+        <hr style="margin: 30px 0;">
+
+        <h3>📦 Anyagfelhasználás</h3>
+        {{ mat_formset.management_form }}
+        <table style="width:100%; text-align:left;">
+            <thead><tr><th>Anyag</th><th>Mennyiség</th><th>Törlés</th></tr></thead>
+            <tbody>
+                {% for f in mat_formset %}
+                <tr>
+                    <td>{{ f.inventory_item }}{% for h in f.hidden_fields %}{{ h }}{% endfor %}</td>
+                    <td>{{ f.quantity }}</td>
+                    <td>{{ f.DELETE }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 30px; text-align: right;">
+            <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Mégse</a>
+            <button type="submit" class="btn btn-primary">Mentés</button>
+        </div>
     </form>
 </div>
 {% endblock %}

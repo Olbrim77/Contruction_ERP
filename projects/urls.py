@@ -28,6 +28,7 @@ urlpatterns = [
     path('project/<int:project_id>/daily-log/new/', views.daily_log_create, name='daily-log-create'),
     path('daily-log/<int:pk>/edit/', views.daily_log_update, name='daily-log-update'),
     path('daily-log/<int:pk>/delete/', views.daily_log_delete, name='daily-log-delete'),
+    path('daily-log/image/<int:pk>/delete/', views.daily_log_image_delete, name='daily-log-image-delete'),
 
     path('project/<int:project_id>/gantt/', views.gantt_view, name='gantt-view'),
     path('project/<int:project_id>/gantt/data/', views.gantt_data, name='gantt-data'),
@@ -46,6 +47,10 @@ urlpatterns = [
 
     path('project/<int:project_id>/document/new/', views.document_create, name='document-create'),
     path('document/<int:pk>/delete/', views.document_delete, name='document-delete'),
+
+    path('daily-log/<int:pk>/', views.daily_log_detail, name='daily-log-detail'),
+
+    path('daily-log/image/<int:pk>/delete/', views.daily_log_image_delete, name='daily-log-image-delete'),
 
     path('project/<int:project_id>/order/new/', views.material_order_create, name='material-order-create'),
     path('project/<int:project_id>/order/from-budget/', views.material_order_create_from_budget,
@@ -81,5 +86,9 @@ urlpatterns = [
     path('tetelsor/<int:pk>/sync-to-master/', views.sync_tetelsor_to_master, name='sync-tetelsor-to-master'),
 
     path('api/uniclass-tree/', views.uniclass_tree_data, name='uniclass-tree-data'),
+
+    path('project/<int:project_id>/chapter/new/', views.project_chapter_create, name='project-chapter-create'),
+
+path('project/<int:project_id>/chapter/new/', views.project_chapter_create, name='project-chapter-create'),
 
 ]

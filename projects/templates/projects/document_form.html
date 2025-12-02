@@ -1,43 +1,36 @@
 {% extends 'projects/base.html' %}
-
-{% block title %}Dokumentum Feltöltés{% endblock %}
-
-{% block breadcrumbs %}
-    <a href="{% url 'project-detail' project.id %}">{{ project.name }}</a> / <span>Dokumentumok</span>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .form-card { background: #fff; padding: 30px; border-radius: 8px; border: 1px solid var(--border); max-width: 500px; margin: 20px auto; text-align: center; }
-    h2 { color: var(--primary); margin-bottom: 20px; }
-    input, select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    .file-input-wrapper { background: #f8f9fa; padding: 20px; border: 2px dashed #ccc; border-radius: 8px; margin-bottom: 20px; }
-</style>
-{% endblock %}
-
+{% block title %}Dokumentumok{% endblock %}
 {% block content %}
-<div class="form-card">
-    <h2>📂 Dokumentum Feltöltése</h2>
+<div style="max-width: 700px; margin: 30px auto; background: #fff; padding: 30px; border-radius: 8px;">
+    <h2 style="color: #005a9c;">📂 Dokumentumok Feltöltése</h2>
+    <p>Egyszerre több fájlt is feltölthetsz az alábbi sorokban.</p>
 
     <form method="POST" enctype="multipart/form-data">
         {% csrf_token %}
+        {{ formset.management_form }}
 
-        <div style="text-align: left;">
-            <label>Dokumentum Típusa</label>
-            {{ form.category }}
+        <table style="width:100%; border-collapse:collapse;">
+            <thead>
+                <tr style="background:#f8f9fa; text-align:left;">
+                    <th style="padding:10px;">Típus</th>
+                    <th style="padding:10px;">Fájl</th>
+                    <th style="padding:10px;">Leírás</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in formset %}
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:10px;">{{ form.category }}</td>
+                    <td style="padding:10px;">{{ form.file }}</td>
+                    <td style="padding:10px;">{{ form.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-            <label>Rövid leírás (Megnevezés)</label>
-            {{ form.description }}
-
-            <div class="file-input-wrapper">
-                <label style="display:block; margin-bottom:10px; font-weight:bold;">Fájl kiválasztása:</label>
-                {{ form.file }}
-            </div>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <div style="margin-top: 30px; text-align: right;">
             <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Mégse</a>
-            <button type="submit" class="btn btn-success">Feltöltés</button>
+            <button type="submit" class="btn btn-primary">Feltöltés</button>
         </div>
     </form>
 </div>

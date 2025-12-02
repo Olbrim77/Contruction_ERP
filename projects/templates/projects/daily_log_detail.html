@@ -1,0 +1,118 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+
+{% block title %}Napló: {{ log.date|date:"Y.m.d" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .log-card { background: #fff; max-width: 900px; margin: 0 auto; border-radius: 8px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); overflow: hidden; }
+    .log-header { background: #005a9c; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .log-header h1 { margin: 0; font-size: 24px; }
+
+    .log-body { padding: 30px; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #eee; }
+    .info-item label { display: block; font-size: 0.85em; color: #666; text-transform: uppercase; font-weight: bold; }
+    .info-item span { font-size: 1.2em; color: #333; font-weight: 500; }
+
+    .section-title { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; color: #005a9c; font-size: 1.2em; margin-top: 30px; }
+    .text-box { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 4px; line-height: 1.6; white-space: pre-wrap; }
+
+    /* Képgaléria */
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+    .gallery a { display: block; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; transition: transform 0.2s; }
+    .gallery a:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .gallery img { width: 100%; height: 120px; object-fit: cover; display: block; }
+
+    /* Anyag táblázat */
+    .mat-table { width: 100%; border-collapse: collapse; }
+    .mat-table th { text-align: left; background: #eee; padding: 8px; border-bottom: 2px solid #ddd; }
+    .mat-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+
+    /* Gombok */
+    .action-bar { padding: 20px; background: #f1f1f1; border-top: 1px solid #ddd; text-align: right; display: flex; justify-content: flex-end; gap: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="log-card">
+    <div class="log-header">
+        <div>
+            <div style="font-size: 0.9em; opacity: 0.9;">{{ project.name }}</div>
+            <h1>Építési Napló: {{ log.date|date:"Y. m. d." }}</h1>
+        </div>
+        <div style="text-align: center; background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 4px;">
+            <div style="font-size: 0.8em;">IDŐJÁRÁS</div>
+            <div style="font-weight: bold;">{{ log.get_weather_display }}</div>
+        </div>
+    </div>
+
+    <div class="log-body">
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Dátum</label>
+                <span>{{ log.date|date:"Y.m.d (l)" }}</span>
+            </div>
+            <div class="info-item">
+                <label>Létszám</label>
+                <span>{{ log.workforce }} fő</span>
+            </div>
+            <div class="info-item">
+                <label>Rögzítve</label>
+                <span>{{ log.id }}. sorszám</span>
+            </div>
+        </div>
+
+        <h3 class="section-title">🚧 Elvégzett Munka</h3>
+        <div class="text-box">{{ log.work_done|default:"-" }}</div>
+
+        {% if log.problems %}
+            <h3 class="section-title" style="color: #d9534f;">⚠️ Problémák / Megjegyzések</h3>
+            <div class="text-box" style="border-left: 4px solid #d9534f;">{{ log.problems }}</div>
+        {% endif %}
+
+        {% if images %}
+            <h3 class="section-title">📷 Fotódokumentáció ({{ images.count }} db)</h3>
+            <div class="gallery">
+                {% for img in images %}
+                    <a href="{{ img.image.url }}" target="_blank">
+                        <img src="{{ img.image.url }}" loading="lazy">
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if materials %}
+            <h3 class="section-title">📦 Beépített Anyagok</h3>
+            <table class="mat-table">
+                <thead>
+                    <tr>
+                        <th>Anyag megnevezés</th>
+                        <th style="width: 100px;">Mennyiség</th>
+                        <th style="width: 80px;">Egység</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mat in materials %}
+                    <tr>
+                        <td>{{ mat.inventory_item.name }}</td>
+                        <td><strong>{{ mat.quantity }}</strong></td>
+                        <td>{{ mat.inventory_item.unit }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
+    <div class="action-bar">
+        <a href="{% url 'project-detail' project.id %}" class="btn btn-secondary">Vissza a projekthez</a>
+        <a href="{% url 'daily-log-update' log.id %}" class="btn btn-primary">✏️ Szerkesztés</a>
+        <form method="POST" action="{% url 'daily-log-delete' log.id %}" style="display:inline;" onsubmit="return confirm('Biztosan törlöd ezt a bejegyzést?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">🗑️ Törlés</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
