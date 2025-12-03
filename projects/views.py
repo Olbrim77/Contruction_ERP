@@ -33,6 +33,8 @@ from .models import (
     Employee, Attendance, PayrollItem # <-- Ezek kellenek a HR dashboardhoz
 )
 
+
+
 # Űrlapok importálása
 from .forms import (
     ProjectForm, TetelsorQuantityForm, TetelsorEditForm, ExpenseForm,
@@ -268,32 +270,27 @@ def task_complete(request, pk):
 
 @login_required
 def project_detail(request, pk):
-    project = get_object_or_404(Project, id=pk)
+    import math  # <--- BIZTONSÁGI IMPORT: Ezt itt kell elhelyezni!
 
-    # --- 1. ADATOK LEKÉRÉSE ---
+    project = get_object_or_404(Project, id=pk)
     tasks = project.tetelsorok.all().order_by('sorszam')
     expenses = project.expenses.all().order_by('-date')
     documents = project.documents.all().order_by('-uploaded_at')
     orders = project.material_orders.all().order_by('-date')
 
-    # Raktárkészlet (hibatűréssel, ha még nincs inventory relation)
     try:
         inventory = project.inventory.all().order_by('name')
     except AttributeError:
         inventory = []
 
-    # --- 2. SZŰRÉS ---
     if request.GET.get('expense_category_filter'):
         expenses = expenses.filter(category=request.GET.get('expense_category_filter'))
-
     if request.GET.get('munkanem_filter'):
         tasks = tasks.filter(munkanem__nev=request.GET.get('munkanem_filter'))
 
-    # Listák a legördülőkhöz
     munkanem_list = Munkanem.objects.all().order_by('nev')
     expense_category_list = [('ANYAG', 'Anyag'), ('MUNKADIJ', 'Munkadíj'), ('EGYEB', 'Egyéb')]
 
-    # --- 3. PÉNZÜGYI ÖSSZESÍTÉS (AGGREGÁCIÓ) ---
     summ = tasks.aggregate(
         mat=Sum('anyag_osszesen'),
         ls=Sum('sajat_munkadij_osszesen'),
@@ -301,39 +298,25 @@ def project_detail(request, pk):
         hours=Sum(F('mennyiseg') * F('normaido')),
     )
 
-    # Tervezett költségek (ha nincs adat, akkor 0)
     plan_mat = summ['mat'] or 0
     plan_ls = summ['ls'] or 0
     plan_la = summ['la'] or 0
     plan_total = plan_mat + plan_ls + plan_la
-
-    # Tényleges kiadások
     spent = expenses.aggregate(s=Sum('amount_netto'))['s'] or 0
-
-    # Egyenleg (Maradék)
-    balance = plan_total - spent
-
-    # --- 4. IDŐTARTAM SZÁMÍTÁS (ITT VOLT A HIBA) ---
     hours = summ['hours'] or 0
 
-    # Biztonságos osztás: ha a hours_per_day nincs megadva, alapértelmezett 8
-    hpd = project.hours_per_day if project.hours_per_day else 8
-
-    # Itt használjuk a math modult tisztán
+    # Dátum számítás javítása math modullal
+    days = 0
+    hpd = project.hours_per_day or 8
     if hpd > 0:
-        days = math.ceil(hours / hpd)
-    else:
-        days = 0
+        days = math.ceil(float(hours) / float(hpd))
 
-    # Befejezés dátuma (Munkanapok alapján)
     end_date = calculate_work_end_date(project.start_date, days)
-
-    # ÁFA és Bruttó számítás
+    balance = plan_total - spent
     vat_rate = project.vat_rate or 27
     total_vat = plan_total * (vat_rate / 100)
     total_project_brutto = plan_total * (1 + vat_rate / 100)
 
-    # --- 5. CONTEXT ÖSSZEÁLLÍTÁSA ---
     context = {
         'project': project,
         'tasks': tasks,
@@ -341,8 +324,6 @@ def project_detail(request, pk):
         'documents': documents,
         'orders': orders,
         'inventory': inventory,
-
-        # Pénzügy
         'plan_anyag': plan_mat,
         'plan_dij': plan_ls + plan_la,
         'plan_total': plan_total,
@@ -351,22 +332,16 @@ def project_detail(request, pk):
         'vat_rate': vat_rate,
         'total_vat': total_vat,
         'total_project_brutto': total_project_brutto,
-
-        # Idő
         'total_effort_hours': hours,
         'total_workdays': days,
         'calculated_end_date': end_date,
-
-        # Szűrők és Státuszok
         'munkanem_list': munkanem_list,
         'expense_category_list': expense_category_list,
         'current_munkanem': request.GET.get('munkanem_filter'),
         'current_expense_category': request.GET.get('expense_category_filter'),
         'all_statuses': Project.STATUS_CHOICES,
     }
-
     return render(request, 'projects/project_detail.html', context)
-
 @login_required
 def project_status_update(request, pk, status_code):
     project = get_object_or_404(Project, id=pk)
@@ -538,14 +513,21 @@ def tetelsor_delete(request, pk):
 
 @login_required
 def import_tasks(request, project_id):
+    # HELYI IMPORTOK (A biztonság kedvéért)
+    import math
+    import os
+    import openpyxl
+    from django.core.files.storage import default_storage
+
     project = get_object_or_404(Project, id=project_id)
 
+    # 1. ESET: Már feltöltöttük, és a lapokat választjuk ki (Feldolgozás)
     if request.method == 'POST' and 'temp_file_path' in request.POST:
         path = os.path.join(settings.MEDIA_ROOT, request.POST.get('temp_file_path'))
+        wb = None  # Inicializálás, hogy a finally blokk ne szálljon el
+        cnt = 0
         try:
-            # JAVÍTÁS: Explicit lezárás és try-except
             wb = openpyxl.load_workbook(path, data_only=True)
-            cnt = 0
             for sheet_name in request.POST.getlist('sheets'):
                 if sheet_name not in wb.sheetnames:
                     continue
@@ -559,7 +541,6 @@ def import_tasks(request, project_id):
                     unit = get_cell_value(row, 4)
                     price = get_cell_decimal(row, 5)
 
-                    # JAVÍTÁS: Üres mezők ellenőrzése
                     mn_nev = get_cell_value(row, 12).strip()
                     mn = None
                     if mn_nev:
@@ -592,34 +573,55 @@ def import_tasks(request, project_id):
                     )
                     cnt += 1
 
-            wb.close()  # FONTOS: Bezárás
             messages.success(request, f"Sikeres import! ({cnt} sor)")
 
         except Exception as e:
-            messages.error(request, f"Hiba: {e}")
+            messages.error(request, f"Hiba az importálás közben: {e}")
         finally:
+            if wb:
+                wb.close()
             if os.path.exists(path):
                 try:
                     os.remove(path)
-                except Exception:
+                except:
                     pass
         return redirect('project-detail', pk=project.id)
 
+    # 2. ESET: Most töltjük fel a fájlt (Feltöltés)
+    if request.method == 'POST' and request.FILES.get('excel_file'):
+        f = request.FILES['excel_file']
+        # Itt mentjük el ideiglenesen
+        path = default_storage.save(f"temp/{f.name}", f)
+
+        try:
+            wb = openpyxl.load_workbook(os.path.join(settings.MEDIA_ROOT, path), read_only=True)
+            sheet_names = wb.sheetnames
+            wb.close()
+            return render(request, 'projects/import_step2_select.html', {
+                'project': project, 'sheet_names': sheet_names, 'temp_file_path': path
+            })
+        except Exception as e:
+            messages.error(request, f"Hiba a fájl olvasásakor: {e}")
+
+    return render(request, 'projects/import_step1_upload.html', {'project': project})
+    # 2. FÁJL FELTÖLTÉSE
     if request.method == 'POST' and request.FILES.get('excel_file'):
         f = request.FILES['excel_file']
         path = default_storage.save(f"temp/{f.name}", f)
 
-        # Csak a lapnevek miatt nyitjuk meg, majd bezárjuk
-        wb = openpyxl.load_workbook(os.path.join(settings.MEDIA_ROOT, path), read_only=True)
-        sheet_names = wb.sheetnames
-        wb.close()
-
-        return render(request, 'projects/import_step2_select.html', {
-            'project': project, 'sheet_names': sheet_names, 'temp_file_path': path
-        })
+        # Csak a lapnevek miatt nyitjuk meg
+        try:
+            wb = openpyxl.load_workbook(os.path.join(settings.MEDIA_ROOT, path), read_only=True)
+            sheet_names = wb.sheetnames
+            wb.close()
+            return render(request, 'projects/import_step2_select.html', {
+                'project': project, 'sheet_names': sheet_names, 'temp_file_path': path
+            })
+        except Exception as e:
+            messages.error(request, f"Nem érvényes Excel fájl: {e}")
+            return redirect('import-tasks', project_id=project.id)
 
     return render(request, 'projects/import_step1_upload.html', {'project': project})
-
 
 @login_required
 def tetelsor_create_from_master_step1(request, project_id):

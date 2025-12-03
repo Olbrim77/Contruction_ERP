@@ -29,29 +29,22 @@ def mobile_daily_log(request, project_id):
 # --- ÚJ: EGYÉNI JELENLÉTI ÍV ---
 @login_required
 def mobile_attendance(request, project_id=None):
-    """
-    A dolgozó saját magának rögzíti a jelenlétét.
-    Ha a project_id meg van adva, azt választja ki alapból, de a listából választhat mást is.
-    """
     today = timezone.now().date()
 
-    # 1. Keressük meg a bejelentkezett dolgozót
     try:
         employee = request.user.employee
     except Employee.DoesNotExist:
         messages.error(request, "A fiókodhoz nincs Dolgozó profil csatolva! Kérd a rendszergazdát.")
         return redirect('mobile-dashboard')
 
-    # 2. Aktív projektek a legördülőhöz
     active_projects = Project.objects.exclude(status__in=['LEZART', 'ELUTASITVA']).order_by('name')
 
-    # 3. Megnézzük, van-e már mára rögzítve adata
     try:
         attendance = Attendance.objects.get(employee=employee, date=today)
         selected_project_id = attendance.project.id
     except Attendance.DoesNotExist:
         attendance = None
-        selected_project_id = project_id  # Ha linkről jött, ez lesz az alapértelmezett
+        selected_project_id = project_id
 
     if request.method == 'POST':
         proj_id = request.POST.get('project')
@@ -63,19 +56,20 @@ def mobile_attendance(request, project_id=None):
         gps_lat = request.POST.get('gps_lat')
         gps_lon = request.POST.get('gps_lon')
 
-        # Óraszámítás (Egyszerűsítve: Vége - Kezdés)
-        # Formátum: "07:00" -> datetime
-        fmt = '%H:%M'
-        t1 = datetime.strptime(start_time, fmt)
-        t2 = datetime.strptime(end_time, fmt)
-        delta = t2 - t1
-        hours = delta.total_seconds() / 3600
-        if hours < 0: hours += 24  # Ha éjfélen átnyúlik
+        # JAVÍTÁS: Biztonságos óraszámítás
+        try:
+            fmt = '%H:%M'
+            t1 = datetime.strptime(start_time, fmt)
+            t2 = datetime.strptime(end_time, fmt)
+            delta = t2 - t1
+            hours = delta.total_seconds() / 3600
+            if hours < 0: hours += 24
+        except (ValueError, TypeError):
+            hours = 8.0  # Fallback
 
-        # Mentés vagy Frissítés
         selected_project = get_object_or_404(Project, id=proj_id)
 
-        att, created = Attendance.objects.update_or_create(
+        Attendance.objects.update_or_create(
             employee=employee,
             date=today,
             defaults={
@@ -90,16 +84,23 @@ def mobile_attendance(request, project_id=None):
             }
         )
 
-        # Előleg kezelése (Külön táblába!)
-        if advance_amount and int(advance_amount) > 0:
-            PayrollItem.objects.create(
-                employee=employee,
-                date=today,
-                type='ADVANCE',
-                amount=advance_amount,
-                note=f"Mobilról igényelve ({today})"
-            )
-            messages.success(request, f"Jelenlét és {advance_amount} Ft előleg rögzítve!")
+        # JAVÍTÁS: Biztonságos előleg mentés
+        if advance_amount:
+            try:
+                amount = int(advance_amount)
+                if amount > 0:
+                    PayrollItem.objects.create(
+                        employee=employee,
+                        date=today,
+                        type='ADVANCE',
+                        amount=amount,
+                        note=f"Mobilról igényelve ({today})"
+                    )
+                    messages.success(request, f"Jelenlét és {amount} Ft előleg rögzítve!")
+                else:
+                    messages.success(request, "Jelenlét sikeresen rögzítve!")
+            except ValueError:
+                messages.warning(request, "Jelenlét rögzítve, de az előleg összege hibás volt!")
         else:
             messages.success(request, "Jelenlét sikeresen rögzítve!")
 
@@ -108,7 +109,7 @@ def mobile_attendance(request, project_id=None):
     return render(request, 'projects/mobile/mobile_attendance.html', {
         'today': today,
         'employee': employee,
-        'attendance': attendance,  # Ha már van, betöltjük az adatait
+        'attendance': attendance,
         'projects': active_projects,
         'selected_project_id': selected_project_id
     })
