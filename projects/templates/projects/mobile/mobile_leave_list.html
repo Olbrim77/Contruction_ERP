@@ -1,0 +1,155 @@
+{% extends 'projects/base.html' %}
+
+{% block title %}Szabadság Igénylés{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-container { max-width: 600px; margin: 0 auto; padding: 15px; background: #fff; min-height: 100vh; }
+
+    .header { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+    .header h2 { margin: 0; color: #005a9c; font-size: 1.6rem; }
+    .back-link { text-decoration: none; color: #666; font-weight: bold; font-size: 0.9rem; display: inline-block; margin-bottom: 10px; }
+
+    /* Kártya */
+    .request-card {
+        background: #fff;
+        border: 1px solid #e1e4e8;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+    }
+
+    label { display: block; font-weight: bold; margin-bottom: 6px; color: #444; font-size: 0.95rem; }
+
+    /* Inputok formázása */
+    input[type="date"], select, textarea {
+        width: 100%; padding: 12px; border: 1px solid #ccc;
+        border-radius: 8px; margin-bottom: 15px; box-sizing: border-box;
+        font-size: 16px; background: #fff; font-family: inherit;
+    }
+
+    input:focus, select:focus, textarea:focus {
+        border-color: #005a9c; outline: none; box-shadow: 0 0 0 3px rgba(0, 90, 156, 0.1);
+    }
+
+    /* Két dátum egymás mellett (Grid) */
+    .date-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* 50% - 50% */
+        gap: 15px;
+    }
+
+    /* Fájl feltöltő doboz (Szaggatott vonal) */
+    .file-upload-box {
+        background: #f8f9fa;
+        border: 2px dashed #ccc;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    /* Hogy ne lógjon ki a fájlválasztó gomb */
+    .file-upload-box input { width: 100%; }
+
+    /* Gomb */
+    .btn-submit {
+        width: 100%; padding: 15px; background: #005a9c; color: white;
+        border: none; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0,90,156,0.2); margin-top: 10px;
+    }
+
+    /* Előzmények Lista */
+    .leave-item {
+        background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px;
+        border: 1px solid #eee; border-left: 5px solid #ccc;
+        display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .status-PENDING { border-left-color: #ffc107; }
+    .status-APPROVED { border-left-color: #28a745; }
+    .status-REJECTED { border-left-color: #dc3545; opacity: 0.7; }
+
+    .leave-dates { font-weight: bold; color: #333; font-size: 1rem; }
+    .leave-type { font-size: 0.85rem; color: #666; text-transform: uppercase; margin-top: 2px; }
+    .status-icon { font-size: 1.5rem; }
+
+    .proof-link { display: inline-block; margin-top: 5px; color: #005a9c; text-decoration: none; font-size: 0.85rem; font-weight: bold; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+
+    <div class="header">
+        <a href="{% url 'mobile-dashboard' %}" class="back-link">⬅ Vissza a menübe</a>
+        <h2>🏖️ Szabadság Igénylés</h2>
+        <p style="color:#666; margin:5px 0 0 0;">{{ employee.name }}</p>
+    </div>
+
+    <div class="request-card">
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="date-row">
+                <div>
+                    <label>Kezdete *</label>
+                    {{ form.start_date }}
+                </div>
+                <div>
+                    <label>Vége *</label>
+                    {{ form.end_date }}
+                </div>
+            </div>
+
+            <label>Távollét típusa *</label>
+            {{ form.leave_type }}
+
+            <label>Igazolás (pl. táppénzes papír)</label>
+            <div class="file-upload-box">
+                {{ form.proof_file }}
+                <small style="display:block; margin-top:5px; color:#888;">Kép vagy PDF formátum</small>
+            </div>
+
+            <label>Megjegyzés</label>
+            {{ form.reason }}
+
+            <button type="submit" class="btn-submit">Kérelem Beküldése 🚀</button>
+        </form>
+    </div>
+
+    <h3 style="color:#555; margin-bottom:15px; padding-left:5px;">Előzmények</h3>
+
+    {% for req in my_requests %}
+        <div class="leave-item status-{{ req.status }}">
+            <div>
+                <div class="leave-dates">
+                    {{ req.start_date|date:"m.d" }} - {{ req.end_date|date:"m.d" }}
+                </div>
+                <div class="leave-type">
+                    {{ req.get_leave_type_display }}
+                </div>
+
+                {% if req.proof_file %}
+                    <a href="{{ req.proof_file.url }}" target="_blank" class="proof-link">📎 Igazolás megtekintése</a>
+                {% endif %}
+
+                {% if req.status == 'REJECTED' and req.rejection_reason %}
+                    <div style="color:#dc3545; font-size:0.8em; margin-top:5px;">Ok: {{ req.rejection_reason }}</div>
+                {% endif %}
+            </div>
+
+            <div class="status-icon" title="{{ req.get_status_display }}">
+                {% if req.status == 'PENDING' %}⏳{% elif req.status == 'APPROVED' %}✅{% else %}❌{% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <div style="text-align:center; padding:30px; color:#999;">
+            <span style="font-size:2rem; display:block; margin-bottom:10px;">📭</span>
+            Még nincs beküldött kérelem.
+        </div>
+    {% endfor %}
+
+</div>
+{% endblock %}

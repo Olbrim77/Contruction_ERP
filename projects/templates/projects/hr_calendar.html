@@ -1,0 +1,240 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+
+{% block title %}Jelenléti Naptár{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* --- KONTÉNER (Teljes képernyős jellegű) --- */
+    .calendar-container {
+        max-width: 100%;
+        padding: 20px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        height: 85vh;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #ddd;
+    }
+
+    /* FEJLÉC SÁV */
+    .header-bar {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;
+        flex: 0 0 auto; /* Fix méret */
+    }
+
+    .header-title h2 { margin: 0; color: #005a9c; }
+    .header-title span { color: #666; font-weight: normal; }
+
+    /* --- TÁBLÁZAT WRAPPER (Ez görgethető) --- */
+    .table-wrapper {
+        flex: 1;        /* Kitölti a maradék helyet */
+        overflow: auto; /* Görgetősávok */
+        border: 1px solid #ccc;
+        position: relative;
+        background: #fff;
+    }
+
+    table { border-collapse: separate; border-spacing: 0; width: max-content; font-size: 13px; }
+
+    /* CELLA ALAPOK */
+    th, td {
+        padding: 0;
+        text-align: center;
+        border-right: 1px solid #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
+        min-width: 35px;
+        height: 35px;
+        vertical-align: middle;
+        box-sizing: border-box;
+    }
+
+    /* --- FIX FEJLÉC (NAPOK) --- */
+    thead th {
+        position: sticky; top: 0;
+        background: #f8f9fa;
+        z-index: 10;
+        border-bottom: 2px solid #bbb;
+        font-weight: bold;
+        color: #555;
+    }
+
+    /* --- FIX ELSŐ OSZLOP (NEVEK) --- */
+    tbody th {
+        position: sticky; left: 0;
+        background: #fff;
+        z-index: 5;
+        text-align: left;
+        min-width: 180px;
+        border-right: 2px solid #ccc;
+        padding-left: 10px;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    }
+
+    /* A bal felső sarok (Név/Dátum metszet) legyen a legtetején */
+    thead th:first-child {
+        left: 0; z-index: 20; border-right: 2px solid #ccc;
+    }
+
+    /* --- STÁTUSZ SZÍNEK --- */
+
+    /* Hétvége */
+    .weekend { background-color: #f0f0f0; color: #bbb; }
+
+    /* Ünnepnap */
+    .holiday {
+        background-color: #ffebee !important;
+        color: #c62828 !important;
+        font-weight: bold;
+        border-left: 2px solid #ef5350;
+        border-right: 2px solid #ef5350;
+    }
+
+    /* Ünnepnap a fejlécben */
+    .holiday-header {
+        background-color: #ffcdd2 !important;
+        color: #b71c1c;
+        border-bottom: 2px solid #b71c1c;
+    }
+
+    /* Munka típusok */
+    .status-WORK { background-color: #e8f5e9; color: #2e7d32; font-weight: bold; } /* Jelen */
+    .status-SZ   { background-color: #28a745; color: white; font-weight: bold; }    /* Szabadság */
+    .status-B    { background-color: #dc3545; color: white; font-weight: bold; }    /* Beteg */
+    .status-F    { background-color: #6c757d; color: white; font-weight: bold; }    /* Fiz. nélküli */
+    .status-I    { background-color: #000000; color: white; font-weight: bold; }    /* Igazolatlan */
+    .status-K    { background-color: #007bff; color: white; font-weight: bold; }    /* Külföld */
+    .status-TP   { background-color: #6f42c1; color: white; font-weight: bold; }    /* Tanulmányi */
+    .status-CS   { background-color: #fd7e14; color: white; font-weight: bold; }    /* Csúsztatás */
+
+    /* Gombok */
+    .btn-nav { padding: 8px 15px; background: #6c757d; text-decoration: none; border-radius: 4px; color: white; font-weight: bold; }
+    .btn-nav:hover { background: #5a6268; }
+
+    /* Mai nap jelölése */
+    .today-col { border: 2px solid #005a9c !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="calendar-container">
+
+    <div class="header-bar">
+        <div class="header-title">
+            <h2 style="margin:0; color:#005a9c;">📅 Havi Jelenléti Naptár</h2>
+            <span>{{ selected_date|date:"Y. F" }}</span>
+        </div>
+
+        <form method="GET" style="display:flex; gap:10px; align-items:center;">
+            <label style="font-weight:bold; color:#555;">Időszak:</label>
+            <input type="month" name="month" value="{{ selected_date|date:'Y-m' }}" onchange="this.form.submit()" style="padding:8px; border-radius:4px; border:1px solid #ccc;">
+        </form>
+
+        <div>
+            <a href="{% url 'hr-dashboard' %}" class="btn-nav">⬅ Vissza a Bérszámfejtéshez</a>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Dolgozó</th>
+
+                    {% for d in header_days %}
+                        <th class="{% if d.is_holiday %}holiday-header{% elif d.is_weekend %}weekend{% endif %} {% if d.date == today %}today-col{% endif %}"
+                            title="{{ d.title }}">
+                            {{ d.day }}
+                        </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in calendar_data %}
+                <tr>
+                    <th>
+                        {{ row.employee.name }}<br>
+                        <small style="font-weight:normal; color:#888;">{{ row.employee.position }}</small>
+                    </th>
+
+                    {% for day in row.days %}
+                        <td class="{% if day.is_holiday %}holiday{% elif day.is_weekend %}weekend{% endif %} status-{{ day.status }} {% if day.date == today %}today-col{% endif %}" title="{{ day.date|date:'Y-m-d' }}">
+
+                            {% if day.attendance %}
+                                {% if day.status == 'WORK' %}
+                                    {{ day.hours|floatformat:0 }}
+                                {% else %}
+                                    {{ day.status }}
+                                {% endif %}
+
+                            {% else %}
+                                {% if day.is_holiday %}
+                                    <span style="color:#b71c1c; font-size:0.8em;">Ü</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 15px; font-size: 0.85em; color: #444; display:flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+        <span><strong>Jelmagyarázat:</strong></span>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#e8f5e9; border:1px solid #ccc; display:inline-block;"></span>
+            <span style="color:#2e7d32;">8 = Munka</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#28a745; display:inline-block;"></span>
+            <span><strong>SZ</strong> = Fiz. Szabadság</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#dc3545; display:inline-block;"></span>
+            <span><strong>B</strong> = Beteg</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#6c757d; display:inline-block;"></span>
+            <span><strong>F</strong> = Fiz. Nélküli</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#000000; display:inline-block;"></span>
+            <span><strong>I</strong> = Igazolatlan</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#007bff; display:inline-block;"></span>
+            <span><strong>K</strong> = Külföld</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#6f42c1; display:inline-block;"></span>
+            <span><strong>TP</strong> = Tanulmányi</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#fd7e14; display:inline-block;"></span>
+            <span><strong>CS</strong> = Csúsztatás</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px; margin-left: 10px;">
+            <span style="width:15px; height:15px; background:#ffebee; border:1px solid #ef5350; display:inline-block;"></span>
+            <span>Ünnepnap</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:15px; height:15px; background:#f0f0f0; border:1px solid #ccc; display:inline-block;"></span>
+            <span>Hétvége</span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

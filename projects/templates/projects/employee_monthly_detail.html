@@ -1,0 +1,79 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+
+{% block title %}{{ employee.name }} - {{ year }}.{{ month }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; padding-bottom:15px; margin-bottom:20px;">
+        <div>
+            <h2 style="margin:0; color:#005a9c;">{{ employee.name }}</h2>
+            <span style="color:#666;">{{ year }}. {{ month }} havi elszámolás</span>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:0.9em; color:#666;">Kifizetendő:</div>
+            <div style="font-size:1.5em; font-weight:bold; color:#28a745;">{{ final_pay|floatformat:0|intcomma }} Ft</div>
+        </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
+
+        <div>
+            <h3 style="border-bottom:1px solid #ddd; padding-bottom:5px;">📅 Jelenléti Ív</h3>
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                <tr style="background:#f9f9f9; text-align:left;">
+                    <th style="padding:8px;">Dátum</th>
+                    <th style="padding:8px;">Projekt</th>
+                    <th style="padding:8px; text-align:right;">Óra</th>
+                </tr>
+                {% for att in attendance_list %}
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:8px;">{{ att.date|date:"d (D)" }}</td>
+                    <td style="padding:8px;">{{ att.project.name|truncatechars:20 }}</td>
+                    <td style="padding:8px; text-align:right; font-weight:bold;">{{ att.hours_worked }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="background:#eef2f7; font-weight:bold;">
+                    <td colspan="2" style="padding:8px;">Összesen:</td>
+                    <td style="padding:8px; text-align:right;">{{ total_hours }} óra</td>
+                </tr>
+            </table>
+            <p style="margin-top:10px; font-size:0.9em;">
+                Alapbér: {{ total_hours }} óra × {{ hourly_rate|floatformat:0 }} Ft = <strong>{{ base_salary|floatformat:0|intcomma }} Ft</strong>
+            </p>
+        </div>
+
+        <div>
+            <h3 style="border-bottom:1px solid #ddd; padding-bottom:5px;">💰 Pénzügyi Tételek</h3>
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                <tr style="background:#f9f9f9; text-align:left;">
+                    <th style="padding:8px;">Dátum</th>
+                    <th style="padding:8px;">Típus</th>
+                    <th style="padding:8px; text-align:right;">Összeg</th>
+                </tr>
+                {% for item in payroll_items %}
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:8px;">{{ item.date|date:"m.d" }}</td>
+                    <td style="padding:8px;">
+                        {% if item.type == 'ADVANCE' %}🔻 Előleg{% elif item.type == 'PREMIUM' %}🏆 Prémium{% else %}{{ item.get_type_display }}{% endif %}
+                    </td>
+                    <td style="padding:8px; text-align:right; font-weight:bold; color:{% if item.type == 'ADVANCE' or item.type == 'DEDUCTION' %}red{% else %}green{% endif %};">
+                        {{ item.amount|floatformat:0|intcomma }} Ft
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" style="padding:10px; text-align:center; color:#999;">Nincs extra tétel.</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+
+    </div>
+
+    <div style="margin-top:30px; text-align:center;">
+        <a href="{% url 'hr-dashboard' %}?month={{ year }}-{{ month|stringformat:'02d' }}" class="btn btn-secondary" style="padding:10px 20px; text-decoration:none; background:#6c757d; color:white; border-radius:4px;">⬅ Vissza az összesítéshez</a>
+        <button onclick="window.print()" class="btn btn-primary" style="padding:10px 20px; border:none; background:#005a9c; color:white; border-radius:4px; cursor:pointer; margin-left:10px;">🖨️ Nyomtatás</button>
+    </div>
+
+</div>
+{% endblock %}

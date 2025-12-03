@@ -64,6 +64,7 @@ urlpatterns = [
     path('mobile/', views_mobile.mobile_dashboard, name='mobile-dashboard'),
     path('mobile/project/<int:pk>/', views_mobile.mobile_project_detail, name='mobile-project-detail'),
     path('mobile/project/<int:project_id>/log/', views_mobile.mobile_daily_log, name='mobile-daily-log'),
+    path('mobile/leave/', views_mobile.mobile_leave_list, name='mobile-leave-list'),
     path('task/<int:pk>/complete/', views.task_complete, name='task-complete'),
     path('task/<int:pk>/complete/', views.task_complete, name='task-complete'),
     path('project/<int:project_id>/gantt/', views.gantt_view, name='gantt-view'),
@@ -73,6 +74,14 @@ urlpatterns = [
     # === ÚJ MODULOK (Helyőrzők) ===
     path('resources/', views.resource_planning, name='resource-planning'),
     path('hr/', views.hr_dashboard, name='hr-dashboard'),
+
+# ... HR ...
+    path('hr/', views.hr_dashboard, name='hr-dashboard'),
+
+path('hr/calendar/', views.hr_calendar, name='hr-calendar'), # <--- EZ AZ ÚJ
+    path('hr/<int:employee_id>/<int:year>/<int:month>/', views.employee_monthly_detail, name='employee-monthly-detail'),
+    # ÚJ SOR:
+    path('hr/<int:employee_id>/<int:year>/<int:month>/', views.employee_monthly_detail, name='employee-monthly-detail'),
     path('inventory/', views.global_inventory, name='global-inventory'),
     path('finance/', views.finance_dashboard, name='finance-dashboard'),
     path('assets/', views.asset_list, name='asset-list'),
@@ -92,5 +101,8 @@ urlpatterns = [
 path('project/<int:project_id>/chapter/new/', views.project_chapter_create, name='project-chapter-create'),
 
 path('mobile/project/<int:project_id>/attendance/', views_mobile.mobile_attendance, name='mobile-attendance'),
+
+path('mobile/select-project/<str:action_type>/', views_mobile.mobile_project_selector, name='mobile-project-select'),
+
 
 ]

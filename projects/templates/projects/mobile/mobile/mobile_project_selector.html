@@ -1,0 +1,54 @@
+{% extends 'projects/base.html' %}
+
+{% block title %}Válassz Projektet{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-container { max-width: 600px; margin: 0 auto; padding: 20px; background: #fff; min-height: 100vh; }
+    .list-header { margin-bottom: 20px; text-align: center; }
+    .list-header h2 { margin: 0; color: #333; }
+
+    .project-list { list-style: none; padding: 0; }
+
+    .project-item {
+        display: block;
+        background: #fff;
+        padding: 20px;
+        border: 1px solid #e1e4e8;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        text-decoration: none;
+        color: #333;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        transition: background 0.1s;
+    }
+    .project-item:active { background-color: #f8f9fa; transform: scale(0.98); }
+
+    .p-title { font-weight: bold; font-size: 1.1rem; color: #005a9c; display: block; margin-bottom: 5px; }
+    .p-loc { font-size: 0.9rem; color: #666; }
+
+    .back-btn { display: inline-block; margin-bottom: 20px; color: #666; text-decoration: none; font-weight: bold; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <a href="{% url 'mobile-dashboard' %}" class="back-btn">⬅ Vissza</a>
+
+    <div class="list-header">
+        <h2>Válassz Projektet</h2>
+        <p>Melyik projekten dolgozol?</p>
+    </div>
+
+    <div class="project-list">
+        {% for p in projects %}
+            <a href="{% if action_type == 'log' %}{% url 'mobile-daily-log' p.id %}{% else %}{% url 'mobile-attendance' p.id %}{% endif %}" class="project-item">
+                <span class="p-title">{{ p.name }}</span>
+                <span class="p-loc">📍 {{ p.location|truncatechars:35 }}</span>
+            </a>
+        {% empty %}
+            <p style="text-align:center; color:#999;">Nincs aktív projekt.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -331,15 +331,15 @@ class Employee(models.Model):
     STATUS_CHOICES = [('ACTIVE', 'Aktív'), ('INACTIVE', 'Inaktív')]
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True,
                                 verbose_name="Felhasználói Fiók")
-    name = models.CharField(max_length=100, verbose_name="Név");
-    position = models.CharField(max_length=100, verbose_name="Pozíció");
-    phone = models.CharField(max_length=50, blank=True, verbose_name="Telefon");
+    name = models.CharField(max_length=100, verbose_name="Név")
+    position = models.CharField(max_length=100, verbose_name="Pozíció")
+    phone = models.CharField(max_length=50, blank=True, verbose_name="Telefon")
     daily_cost = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Napi Bérköltség (Ft)")
-    tax_id = models.CharField(max_length=50, blank=True, verbose_name="Adóazonosító");
-    address = models.CharField(max_length=255, blank=True, verbose_name="Lakcím");
-    registration_form = models.FileField(upload_to='hr_docs/', blank=True, null=True, verbose_name="Bejelentő lap");
-    contract_file = models.FileField(upload_to='hr_docs/', blank=True, null=True, verbose_name="Munkaszerződés");
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE', verbose_name="Státusz");
+    tax_id = models.CharField(max_length=50, blank=True, verbose_name="Adóazonosító")
+    address = models.CharField(max_length=255, blank=True, verbose_name="Lakcím")
+    registration_form = models.FileField(upload_to='hr_docs/', blank=True, null=True, verbose_name="Bejelentő lap")
+    contract_file = models.FileField(upload_to='hr_docs/', blank=True, null=True, verbose_name="Munkaszerződés")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE', verbose_name="Státusz")
     joined_date = models.DateField(null=True, blank=True, verbose_name="Belépés dátuma")
 
     def __str__(self): return self.name
@@ -347,38 +347,106 @@ class Employee(models.Model):
     class Meta: verbose_name = "Dolgozó"; verbose_name_plural = "Dolgozók"
 
 
-class Attendance(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Dolgozó");
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, verbose_name="Munkaterület");
-    date = models.DateField(default=timezone.now, verbose_name="Dátum")
-    start_time = models.TimeField(default="07:00", verbose_name="Kezdés");
-    end_time = models.TimeField(default="16:00", verbose_name="Befejezés");
-    hours_worked = models.DecimalField(max_digits=4, decimal_places=1, default=0, verbose_name="Ledolgozott óra")
-    is_driver = models.BooleanField(default=False, verbose_name="Sofőr");
-    is_abroad = models.BooleanField(default=False, verbose_name="Külföld")
-    gps_lat = models.CharField(max_length=50, blank=True, null=True, verbose_name="GPS Szél.");
-    gps_lon = models.CharField(max_length=50, blank=True, null=True, verbose_name="GPS Hossz.");
-    check_in_photo = models.ImageField(upload_to='attendance_photos/%Y/%m/', blank=True, null=True,
-                                       verbose_name="Fotó");
-    created_at = models.DateTimeField(auto_now_add=True)
+class LeaveBalance(models.Model):
+    """ ÉVES SZABADSÁG EGYENLEG """
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_balances')
+    year = models.IntegerField(default=timezone.now().year, verbose_name="Év")
 
-    class Meta: verbose_name = "Jelenlét"; verbose_name_plural = "Jelenléti Ívek"; ordering = [
-        '-date']; unique_together = ('employee', 'date')
+    base_leave = models.IntegerField(default=20, verbose_name="Alapszabadság")
+    age_leave = models.IntegerField(default=0, verbose_name="Életkor utáni pótszab.")
+    child_leave = models.IntegerField(default=0, verbose_name="Gyermek utáni pótszab.")
+    carry_over = models.IntegerField(default=0, verbose_name="Tavalyról áthozott")
+
+    def total_days(self):
+        return self.base_leave + self.age_leave + self.child_leave + self.carry_over
+
+    def __str__(self): return f"{self.employee.name} - {self.year} ({self.total_days()} nap)"
+
+    class Meta: unique_together = ('employee', 'year'); verbose_name = "Szabadság Egyenleg"
+
+
+class PublicHoliday(models.Model):
+    """ ÜNNEPNAPOK ÉS MUNKANAP ÁTHELYEZÉSEK """
+    date = models.DateField(unique=True, verbose_name="Dátum")
+    name = models.CharField(max_length=100, verbose_name="Ünnep neve (pl. Karácsony)")
+    is_workday = models.BooleanField(default=False, verbose_name="Munkanap? (Szombati ledolgozás)")
+
+    def __str__(self): return f"{self.date} - {self.name}"
+
+    class Meta: verbose_name = "Ünnepnap / Munkarend"; ordering = ['date']
+
+
+class Attendance(models.Model):
+    """ JELENLÉTI ÍV (NAPI STÁTUSSZAL) """
+    STATUS_CHOICES = [
+        ('WORK', '✅ Jelen (Munka)'),
+        ('SZ', '🟢 Fizetett Szabadság'),
+        ('B', '🔴 Betegszabadság'),
+        ('F', '⚪ Fizetés nélküli'),
+        ('I', '⚫ Igazolatlan'),
+        ('K', '🔵 Kiküldetés / Külföld'),
+        ('TP', '📚 Tanulmányi szabadság'),
+        ('CS', '⏳ Csúsztatás')
+    ]
+
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Dolgozó")
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, verbose_name="Munkaterület", null=True,
+                                blank=True)  # Nullable, ha pl. beteg
+    date = models.DateField(default=timezone.now, verbose_name="Dátum")
+
+    # Státusz (Alapértelmezett: Munka)
+    status = models.CharField(max_length=5, choices=STATUS_CHOICES, default='WORK', verbose_name="Típus")
+
+    start_time = models.TimeField(default="07:00", verbose_name="Kezdés")
+    end_time = models.TimeField(default="16:00", verbose_name="Befejezés")
+    hours_worked = models.DecimalField(max_digits=4, decimal_places=1, default=0, verbose_name="Ledolgozott óra")
+
+    is_driver = models.BooleanField(default=False, verbose_name="Sofőr")
+    is_abroad = models.BooleanField(default=False, verbose_name="Külföld")
+
+    gps_lat = models.CharField(max_length=50, blank=True, null=True)
+    gps_lon = models.CharField(max_length=50, blank=True, null=True)
+    check_in_photo = models.ImageField(upload_to='attendance_photos/%Y/%m/', blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  # Utolsó módosítás ideje
+
+    class Meta:
+        verbose_name = "Jelenlét";
+        verbose_name_plural = "Jelenléti Ívek";
+        ordering = ['-date']
+        unique_together = ('employee', 'date')
+
+
+class AttendanceAuditLog(models.Model):
+    """ AUDIT NAPLÓ: KI, MIKOR, MIT MÓDOSÍTOTT? """
+    attendance = models.ForeignKey(Attendance, on_delete=models.CASCADE, related_name='audit_logs')
+    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Módosító")
+    modified_at = models.DateTimeField(auto_now_add=True, verbose_name="Időpont")
+
+    original_value = models.TextField(verbose_name="Eredeti érték")
+    new_value = models.TextField(verbose_name="Új érték")
+    reason = models.CharField(max_length=255, blank=True, verbose_name="Módosítás oka")
+
+    def __str__(self): return f"{self.attendance} módosítva ekkor: {self.modified_at}"
 
 
 class PayrollItem(models.Model):
+    # ... (Ez marad változatlan a korábbiakból) ...
     TYPE_CHOICES = [('ADVANCE', '💰 Előleg'), ('PREMIUM', '🏆 Prémium'), ('DEDUCTION', '🔻 Levonás'),
-                    ('VACATION', '🏖️ Szabadság'), ('SICK_LEAVE', '🤒 Betegszabadság')]
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Dolgozó");
-    date = models.DateField(default=timezone.now, verbose_name="Dátum");
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="Típus");
-    amount = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Összeg (Ft)");
-    note = models.TextField(blank=True, verbose_name="Megjegyzés");
+                    ('VACATION', '🏖️ Szabadság kifizetés'), ('SICK_LEAVE', '🤒 Táppénz kieg.')]
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Dolgozó")
+    date = models.DateField(default=timezone.now, verbose_name="Dátum")
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="Típus")
+    amount = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Összeg (Ft)")
+    note = models.TextField(blank=True, verbose_name="Megjegyzés")
     approved = models.BooleanField(default=False, verbose_name="Jóváhagyva")
 
     def __str__(self): return f"{self.employee.name} - {self.get_type_display()}"
 
     class Meta: verbose_name = "Bér Tétel"; verbose_name_plural = "Bér Tételek"; ordering = ['-date']
+
+
 
 
 # --- CÉGADATOK (EZT PÓTOLTUK!) ---
@@ -412,3 +480,43 @@ class CompanySite(models.Model): company = models.ForeignKey(CompanySettings, on
 class Signatory(models.Model): company = models.ForeignKey(CompanySettings, on_delete=models.CASCADE,
                                                            related_name='signatories'); name = models.CharField(
     max_length=100); position = models.CharField(max_length=100, default="Ügyvezető")
+
+
+# projects/models.py
+
+# ... (a fájl vége) ...
+
+class LeaveRequest(models.Model):
+    """ SZABADSÁG IGÉNYLÉSEK """
+    STATUS_CHOICES = [
+        ('PENDING', '⏳ Függőben'),
+        ('APPROVED', '✅ Elfogadva'),
+        ('REJECTED', '❌ Elutasítva'),
+    ]
+
+    LEAVE_TYPES = [
+        ('SZ', 'Fizetett Szabadság'),
+        ('B', 'Betegszabadság'),
+        ('F', 'Fizetés nélküli'),
+        ('TP', 'Tanulmányi'),
+    ]
+
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Dolgozó")
+    start_date = models.DateField(verbose_name="Kezdete")
+    end_date = models.DateField(verbose_name="Vége")
+    leave_type = models.CharField(max_length=5, choices=LEAVE_TYPES, default='SZ', verbose_name="Típus")
+    reason = models.TextField(blank=True, verbose_name="Indoklás")
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING', verbose_name="Státusz")
+    proof_file = models.FileField(upload_to='leave_proofs/%Y/', blank=True, null=True,
+                                  verbose_name="Igazolás (Fotó/PDF)")
+    rejection_reason = models.TextField(blank=True, verbose_name="Elutasítás oka")  # Ha nem engedik
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return f"{self.employee.name}: {self.start_date} - {self.end_date} ({self.get_status_display()})"
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Szabadság Kérelem"
+        verbose_name_plural = "Szabadság Kérelmek"

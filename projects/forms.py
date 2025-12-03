@@ -7,7 +7,7 @@ from .models import (
     Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
     Supplier, Material, MasterItem, ItemComponent, ProjectDocument,
     MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage,
-    UniclassNode, LaborComponent, MachineComponent, Operation, Machine, DailyLogImage,ProjectChapter
+    UniclassNode, LaborComponent, MachineComponent, Operation, Machine, DailyLogImage,ProjectChapter, LeaveRequest
 )
 
 # --- SEGÉD: Dátum és Uniclass ---
@@ -165,4 +165,20 @@ class ProjectChapterForm(forms.ModelForm):
         }
         widgets = {
             'rank': forms.NumberInput(attrs={'step': '10'})
+
+        }
+
+
+# KÜLÖN, FELSŐ SZINTŰ ŰRLAP: Szabadság igénylés
+class LeaveRequestForm(forms.ModelForm):
+    class Meta:
+        model = LeaveRequest
+        fields = ['start_date', 'end_date', 'leave_type', 'reason', 'proof_file']  # proof_file hozzáadva
+        widgets = {
+            # Mobil naptár megjelenítéséhez
+            'start_date': DateInput(),
+            'end_date': DateInput(),
+            'reason': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Megjegyzés (opcionális)...'}),
+            # Fájl feltöltő (képet és pdf-et fogad el)
+            'proof_file': forms.FileInput(attrs={'accept': 'image/*,application/pdf', 'class': 'file-input'})
         }

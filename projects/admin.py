@@ -1,6 +1,33 @@
 # projects/admin.py
 from django.contrib import admin
-from .models import Project, Task, Munkanem, Alvallalkozo, Supplier, Material, MasterItem, ItemComponent, Tetelsor, Expense, DailyLog, ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, UniclassNode, Operation, Machine, LaborComponent, MachineComponent, Employee, Attendance, PayrollItem
+from .models import (
+    Project,
+    Task,
+    Munkanem,
+    Alvallalkozo,
+    Supplier,
+    Material,
+    MasterItem,
+    ItemComponent,
+    Tetelsor,
+    Expense,
+    DailyLog,
+    ProjectDocument,
+    MaterialOrder,
+    OrderItem,
+    ProjectInventory,
+    UniclassNode,
+    Operation,
+    Machine,
+    LaborComponent,
+    MachineComponent,
+    Employee,
+    Attendance,
+    PayrollItem,
+    LeaveBalance,
+    PublicHoliday,
+    AttendanceAuditLog,
+)
 
 class TaskInline(admin.TabularInline): model = Task; extra = 1
 class ItemComponentInline(admin.TabularInline): model = ItemComponent; extra = 1
@@ -53,3 +80,21 @@ class AttendanceAdmin(admin.ModelAdmin):
 class PayrollItemAdmin(admin.ModelAdmin):
     list_display = ('date', 'employee', 'type', 'amount', 'approved')
     list_filter = ('type', 'employee', 'approved')
+
+
+@admin.register(LeaveBalance)
+class LeaveBalanceAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'year', 'total_days')
+    list_filter = ('year',)
+
+
+@admin.register(PublicHoliday)
+class PublicHolidayAdmin(admin.ModelAdmin):
+    list_display = ('date', 'name', 'is_workday')
+    ordering = ['date']
+
+
+@admin.register(AttendanceAuditLog)
+class AttendanceAuditLogAdmin(admin.ModelAdmin):
+    list_display = ('attendance', 'modified_by', 'modified_at', 'reason')
+    readonly_fields = ('attendance', 'modified_by', 'modified_at', 'original_value', 'new_value')

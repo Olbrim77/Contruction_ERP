@@ -30,7 +30,7 @@ from .models import (
     ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage,
     GanttLink, UniclassNode, LaborComponent, MachineComponent, Operation, Machine,
     DailyLogImage, ProjectChapter,
-    Employee, Attendance, PayrollItem # <-- Ezek kellenek a HR dashboardhoz
+    Employee, Attendance, PayrollItem, PublicHoliday # <-- Ezek kellenek a HR dashboardhoz és naptárhoz
 )
 
 
@@ -1605,3 +1605,155 @@ def project_map_view(request): return render(request, 'projects/placeholder.html
 
 @login_required
 def crm_dashboard(request): return render(request, 'projects/placeholder.html', {'title': '🤝 CRM'})
+
+
+@login_required
+def employee_monthly_detail(request, employee_id, year, month):
+    """ Egy dolgozó havi részletes elszámolása """
+    employee = get_object_or_404(Employee, id=employee_id)
+
+    # Dátumtartomány
+    import calendar
+    _, last_day = calendar.monthrange(year, month)
+    start_date = datetime(year, month, 1).date()
+    end_date = datetime(year, month, last_day).date()
+
+    # 1. Jelenlétek listája
+    attendance_list = Attendance.objects.filter(
+        employee=employee,
+        date__range=(start_date, end_date)
+    ).order_by('date')
+
+    total_hours = attendance_list.aggregate(Sum('hours_worked'))['hours_worked__sum'] or 0
+
+    # 2. Pénzügyi tételek
+    payroll_items = PayrollItem.objects.filter(
+        employee=employee,
+        date__range=(start_date, end_date)
+    ).order_by('date')
+
+    # Számítások
+    daily_cost = employee.daily_cost or 0
+    hourly_rate = Decimal(daily_cost) / Decimal(8)
+    base_salary = Decimal(total_hours) * hourly_rate
+
+    advances = payroll_items.filter(type='ADVANCE').aggregate(Sum('amount'))['amount__sum'] or 0
+    premiums = payroll_items.filter(type='PREMIUM').aggregate(Sum('amount'))['amount__sum'] or 0
+    deductions = payroll_items.filter(type='DEDUCTION').aggregate(Sum('amount'))['amount__sum'] or 0
+
+    final_pay = base_salary + premiums - advances - deductions
+
+    context = {
+        'employee': employee,
+        'year': year,
+        'month': month,
+        'attendance_list': attendance_list,
+        'payroll_items': payroll_items,
+        'total_hours': total_hours,
+        'hourly_rate': hourly_rate,
+        'base_salary': base_salary,
+        'final_pay': final_pay,
+        'advances': advances,
+        'premiums': premiums
+    }
+    return render(request, 'projects/employee_monthly_detail.html', context)
+
+
+
+
+@login_required
+def hr_calendar(request):
+    import calendar
+
+    today = timezone.now().date()
+    selected_month_str = request.GET.get('month')
+
+    if selected_month_str:
+        try:
+            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date()
+        except ValueError:
+            selected_date = today.replace(day=1)
+    else:
+        selected_date = today.replace(day=1)
+
+    year = selected_date.year
+    month = selected_date.month
+
+    num_days = calendar.monthrange(year, month)[1]
+    days_range = range(1, num_days + 1)
+
+    # 1. ÜNNEPNAPOK LEKÉRÉSE (ÚJ RÉSZ)
+    # Lekérjük az erre a hónapra eső szabályokat
+    holidays = PublicHoliday.objects.filter(date__year=year, date__month=month)
+    # Szótárba rakjuk a gyors kereséshez: { nap_száma : PublicHolidayObjektum }
+    holiday_map = {h.date.day: h for h in holidays}
+
+    employees = Employee.objects.filter(status='ACTIVE').order_by('name')
+    calendar_data = []
+
+    for emp in employees:
+        attendances = Attendance.objects.filter(employee=emp, date__year=year, date__month=month)
+        att_map = {a.date.day: a for a in attendances}
+
+        row_days = []
+        for day in days_range:
+            current_day_date = datetime(year, month, day).date()
+            weekday = current_day_date.weekday()  # 0=Hétfő ... 6=Vasárnap
+
+            # --- NAP TÍPUSÁNAK MEGHATÁROZÁSA ---
+            holiday_obj = holiday_map.get(day)
+
+            is_holiday = False
+            holiday_name = ""
+
+            if holiday_obj:
+                # Ha van bejegyzés a PublicHoliday táblában:
+                if holiday_obj.is_workday:
+                    # Áthelyezett munkanap (pl. Szombat, de dolgozni kell)
+                    is_weekend = False
+                    is_holiday = False
+                else:
+                    # Fizetett ünnep (pl. Márc. 15) - Pihenőnap
+                    is_weekend = True
+                    is_holiday = True
+                    holiday_name = holiday_obj.name
+            else:
+                # Normál naptári logika
+                is_weekend = weekday >= 5
+
+            att = att_map.get(day)
+
+            row_days.append({
+                'day': day,
+                'is_weekend': is_weekend,  # Ez most már "pihenőnap"-ot jelent (hétvége VAGY ünnep)
+                'is_holiday': is_holiday,  # Ez jelöli, ha piros betűs ünnep
+                'holiday_name': holiday_name,
+                'attendance': att,
+                'status': att.status if att else None,
+                'hours': att.hours_worked if att else None
+            })
+
+        calendar_data.append({'employee': emp, 'days': row_days})
+
+    # A fejléc színezéséhez is át kell adnunk a napok státuszát
+    # Készítünk egy "header_days" listát
+    header_days = []
+    for day in days_range:
+        h_obj = holiday_map.get(day)
+        d_date = datetime(year, month, day).date()
+        is_h = False
+        if h_obj and not h_obj.is_workday: is_h = True
+        header_days.append({
+            'day': day,
+            'is_weekend': (d_date.weekday() >= 5 and not (h_obj and h_obj.is_workday)) or is_h,
+            'is_holiday': is_h,
+            'title': h_obj.name if h_obj else ""
+        })
+
+    context = {
+        'selected_date': selected_date,
+        'header_days': header_days,  # Javított fejléc adatok
+        'calendar_data': calendar_data,
+        'today': today
+    }
+    return render(request, 'projects/hr_calendar.html', context)
