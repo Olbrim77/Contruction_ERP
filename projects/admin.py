@@ -1,6 +1,6 @@
 # projects/admin.py
 from django.contrib import admin
-from .models import Project, Task, Munkanem, Alvallalkozo, Supplier, Material, MasterItem, ItemComponent, Tetelsor, Expense, DailyLog, ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, UniclassNode, Operation, Machine, LaborComponent, MachineComponent
+from .models import Project, Task, Munkanem, Alvallalkozo, Supplier, Material, MasterItem, ItemComponent, Tetelsor, Expense, DailyLog, ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, UniclassNode, Operation, Machine, LaborComponent, MachineComponent, Employee, Attendance, PayrollItem
 
 class TaskInline(admin.TabularInline): model = Task; extra = 1
 class ItemComponentInline(admin.TabularInline): model = ItemComponent; extra = 1
@@ -37,3 +37,19 @@ admin.site.register(DailyLog)
 admin.site.register(ProjectDocument)
 admin.site.register(MaterialOrder)
 admin.site.register(ProjectInventory)
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'position', 'phone', 'daily_cost', 'status')
+    list_filter = ('status', 'position')
+    search_fields = ('name',)
+
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+    list_display = ('date', 'employee', 'project', 'hours_worked')
+    list_filter = ('date', 'project', 'employee')
+
+@admin.register(PayrollItem)
+class PayrollItemAdmin(admin.ModelAdmin):
+    list_display = ('date', 'employee', 'type', 'amount', 'approved')
+    list_filter = ('type', 'employee', 'approved')

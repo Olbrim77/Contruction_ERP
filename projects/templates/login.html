@@ -1,0 +1,43 @@
+{% extends 'projects/base.html' %}
+
+{% block title %}Bejelentkezés{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: center; align-items: center; height: 80vh;">
+    <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
+
+        <h2 style="color: #005a9c; margin-bottom: 20px;">🏗️ Építő ERP</h2>
+        <p style="color: #666; margin-bottom: 30px;">Kérlek jelentkezz be a folytatáshoz</p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-size: 0.9em;">
+                    Hibás felhasználónév vagy jelszó!
+                </div>
+            {% endif %}
+
+            <div style="margin-bottom: 15px; text-align: left;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #444;">Felhasználónév</label>
+                <input type="text" name="username" autofocus required
+                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+            </div>
+
+            <div style="margin-bottom: 25px; text-align: left;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #444;">Jelszó</label>
+                <input type="password" name="password" required
+                       style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+            </div>
+
+            <button type="submit" style="width: 100%; background: #005a9c; color: white; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                Belépés
+            </button>
+        </form>
+
+        <p style="margin-top: 20px; font-size: 0.9em; color: #888;">
+            Nincs még fiókod? Kérd a rendszergazdát!
+        </p>
+    </div>
+</div>
+{% endblock %}

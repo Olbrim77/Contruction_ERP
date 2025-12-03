@@ -1,0 +1,161 @@
+{% extends 'projects/base.html' %}
+
+{% block title %}Jelenléti Ív{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .mobile-container { max-width: 600px; margin: 0 auto; padding: 15px; background: #fff; min-height: 90vh; }
+
+    /* Kártya stílus */
+    .card-box {
+        border: 1px solid #e1e4e8;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background: #f8f9fa;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    label { display: block; font-weight: bold; margin-bottom: 5px; color: #444; }
+
+    /* Nagy Inputok mobilra */
+    select, input[type="time"], input[type="number"] {
+        width: 100%; padding: 12px; border: 1px solid #ccc;
+        border-radius: 8px; font-size: 16px; background: #fff;
+        margin-bottom: 15px; box-sizing: border-box;
+    }
+
+    /* Idősor */
+    .time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+    /* Összesítő sáv */
+    .total-hours {
+        background: #e3f2fd; color: #0d47a1; padding: 10px;
+        text-align: center; border-radius: 6px; font-weight: bold; margin-bottom: 15px;
+    }
+
+    /* Checkbox sor */
+    .checkbox-row {
+        display: flex; align-items: center; gap: 15px; margin-bottom: 15px;
+        padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 8px;
+    }
+    input[type="checkbox"] { transform: scale(1.5); }
+
+    /* GPS Ikon */
+    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .gps-icon {
+        font-size: 1.5rem; width: 40px; height: 40px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; background: #f8d7da; color: #721c24;
+        transition: all 0.5s;
+    }
+    .gps-ok { background: #d4edda; color: #155724; }
+
+    .btn-save {
+        width: 100%; padding: 15px; background: #005a9c; color: white;
+        border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer;
+    }
+    .btn-save:disabled { background: #ccc; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+
+    <div class="header-row">
+        <div>
+            <h2 style="margin:0; color:#005a9c;">Jelenléti Ív</h2>
+            <small>{{ today|date:"Y.m.d (l)" }} | {{ employee.name }}</small>
+        </div>
+        <div id="gps-icon" class="gps-icon" title="GPS Keresése...">
+            <i class="fa-solid fa-location-dot"></i>
+        </div>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="gps_lat" id="gps_lat">
+        <input type="hidden" name="gps_lon" id="gps_lon">
+
+        <div class="card-box">
+            <label>📍 Teljesítés helye (Projekt)</label>
+            <select name="project" required>
+                <option value="" disabled {% if not selected_project_id %}selected{% endif %}>-- Válassz projektet --</option>
+                {% for p in projects %}
+                    <option value="{{ p.id }}" {% if p.id == selected_project_id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="time-row">
+                <div>
+                    <label>Kezdés</label>
+                    <input type="time" name="start_time" id="start_time" value="{{ attendance.start_time|time:'H:i'|default:'07:00' }}" onchange="calcHours()">
+                </div>
+                <div>
+                    <label>Befejezés</label>
+                    <input type="time" name="end_time" id="end_time" value="{{ attendance.end_time|time:'H:i'|default:'16:00' }}" onchange="calcHours()">
+                </div>
+            </div>
+
+            <div class="total-hours" id="total-display">
+                ⏱️ Számított idő: 9.0 óra
+            </div>
+
+            <label class="checkbox-row">
+                <input type="checkbox" name="is_driver" {% if attendance.is_driver %}checked{% endif %}>
+                <span>🚗 Sofőr pótlék</span>
+            </label>
+
+            <label class="checkbox-row">
+                <input type="checkbox" name="is_abroad" {% if attendance.is_abroad %}checked{% endif %}>
+                <span>🌍 Külföldi munkavégzés</span>
+            </label>
+        </div>
+
+        <div class="card-box" style="border-top: 4px solid #ffc107;">
+            <label>💰 Előleg kérése (Ft)</label>
+            <input type="number" name="advance_amount" placeholder="0" step="1000">
+            <small style="color:#666;">Csak akkor töltsd ki, ha készpénzt kérsz!</small>
+        </div>
+
+        <button type="submit" class="btn-save" id="save-btn">💾 Mentés</button>
+    </form>
+</div>
+
+<script>
+    // GPS Kezelés
+    document.addEventListener("DOMContentLoaded", function() {
+        calcHours(); // Induláskor is számoljon
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(pos){
+                document.getElementById("gps_lat").value = pos.coords.latitude;
+                document.getElementById("gps_lon").value = pos.coords.longitude;
+
+                var icon = document.getElementById("gps-icon");
+                icon.classList.add("gps-ok");
+                icon.title = "GPS Pozíció OK";
+            }, function(err){
+                alert("Nem sikerült a GPS pozíció lekérése. Kérlek engedélyezd!");
+            });
+        }
+    });
+
+    // Munkaóra kalkulátor
+    function calcHours() {
+        var start = document.getElementById("start_time").value;
+        var end = document.getElementById("end_time").value;
+
+        if(start && end) {
+            var s = new Date("1970-01-01 " + start);
+            var e = new Date("1970-01-01 " + end);
+
+            var diff = (e - s) / 1000 / 60 / 60; // Órában
+            if (diff < 0) diff += 24; // Ha átnyúlik éjfélre
+
+            document.getElementById("total-display").innerHTML = "⏱️ Számított idő: " + diff.toFixed(1) + " óra";
+        }
+    }
+</script>
+{% endblock %}

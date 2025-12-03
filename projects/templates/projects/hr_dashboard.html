@@ -1,0 +1,74 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+
+{% block title %}HR és Bérszámfejtés{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hr-container { max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    .hr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+    .month-selector input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; }
+    td { padding: 12px; border-bottom: 1px solid #eee; }
+
+    .numeric { text-align: right; font-family: monospace; }
+    .total-row { font-weight: bold; background: #eef2f7; }
+    .negative { color: #dc3545; }
+    .positive { color: #28a745; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hr-container">
+
+    <div class="hr-header">
+        <h2>👥 Havi Bérszámfejtés</h2>
+
+        <form method="GET" class="month-selector">
+            <label>Időszak:</label>
+            <input type="month" name="month" value="{{ selected_date|date:'Y-m' }}" onchange="this.form.submit()">
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Dolgozó</th>
+                <th class="numeric">Órák</th>
+                <th class="numeric">Alapbér</th>
+                <th class="numeric" style="color:green;">+ Prémium</th>
+                <th class="numeric" style="color:red;">- Előleg</th>
+                <th class="numeric" style="color:red;">- Levonás</th>
+                <th class="numeric">Kifizetendő</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in payroll_data %}
+            <tr>
+                <td>
+                    <strong>{{ row.employee.name }}</strong><br>
+                    <small style="color:#666;">{{ row.employee.position }}</small>
+                </td>
+                <td class="numeric">{{ row.hours }} óra</td>
+                <td class="numeric">{{ row.base_salary|floatformat:0|intcomma }} Ft</td>
+                <td class="numeric positive">{{ row.premiums|floatformat:0|intcomma }} Ft</td>
+                <td class="numeric negative">{{ row.advances|floatformat:0|intcomma }} Ft</td>
+                <td class="numeric negative">{{ row.deductions|floatformat:0|intcomma }} Ft</td>
+                <td class="numeric" style="font-weight:bold; font-size:1.1em; border-left: 2px solid #eee;">
+                    {{ row.final_pay|floatformat:0|intcomma }} Ft
+                </td>
+                <td style="text-align:center;">
+                    <a href="#" class="btn btn-sm btn-secondary">Részletek</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" style="text-align:center; padding:30px;">Nincs adat erre a hónapra.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+{% endblock %}

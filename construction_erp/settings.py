@@ -119,4 +119,12 @@ DATE_INPUT_FORMATS = [
     '%Y.%m.%d',       # 2025.11.26
     '%d/%m/%Y',       # 26/11/2025
     '%Y/%m/%d',       # 2025/11/26
+
 ]
+
+# Sikeres belépés után ide visz (a projekt listára)
+LOGIN_REDIRECT_URL = '/'
+# Kijelentkezés után ide visz
+LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+

@@ -91,4 +91,6 @@ urlpatterns = [
 
 path('project/<int:project_id>/chapter/new/', views.project_chapter_create, name='project-chapter-create'),
 
+path('mobile/project/<int:project_id>/attendance/', views_mobile.mobile_attendance, name='mobile-attendance'),
+
 ]

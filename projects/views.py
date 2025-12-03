@@ -4,16 +4,18 @@ from decimal import Decimal
 import math
 import os
 import re
-from datetime import timedelta
+from datetime import timedelta, datetime # <--- datetime hozzáadva
 
 import openpyxl
-from django.core.files.storage import default_storage
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.staticfiles import finders
+from django.core.files.storage import default_storage
 from django.db import transaction
-from django.db.models import Sum, F, Q
+# JAVÍTÁS: Itt vannak a hiányzó importok a fájl elején, nem a közepén!
+from django.db.models import Sum, F, Q, Count
+from django.db.models.functions import TruncMonth
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import get_template
@@ -21,14 +23,30 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
 
-# Modellek importálása
+# Modellek importálása (HR modellekkel bővítve)
 from .models import (
     Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
     Supplier, Material, MasterItem, ItemComponent, CompanySettings,
     ProjectDocument, MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage,
     GanttLink, UniclassNode, LaborComponent, MachineComponent, Operation, Machine,
-    DailyLogImage,ProjectChapter
+    DailyLogImage, ProjectChapter,
+    Employee, Attendance, PayrollItem # <-- Ezek kellenek a HR dashboardhoz
 )
+
+# Űrlapok importálása
+from .forms import (
+    ProjectForm, TetelsorQuantityForm, TetelsorEditForm, ExpenseForm,
+    DailyLogForm, TetelsorCreateFromMasterForm, MasterItemForm, ItemComponentForm,
+    ProjectDocumentForm, MaterialOrderForm, OrderItemFormSet, DailyMaterialUsageFormSet,
+    TaskForm, LaborComponentForm, MachineComponentForm, MobilePhotoForm,
+    MaterialInlineFormSet, LaborInlineFormSet, MachineInlineFormSet,
+    DailyLogImageFormSet, ProjectDocumentFormSet, ProjectChapterForm
+)
+
+try:
+    from xhtml2pdf import pisa
+except ImportError:
+    pisa = None
 
 # Űrlapok importálása
 from .forms import (
@@ -251,25 +269,31 @@ def task_complete(request, pk):
 @login_required
 def project_detail(request, pk):
     project = get_object_or_404(Project, id=pk)
+
+    # --- 1. ADATOK LEKÉRÉSE ---
     tasks = project.tetelsorok.all().order_by('sorszam')
     expenses = project.expenses.all().order_by('-date')
     documents = project.documents.all().order_by('-uploaded_at')
     orders = project.material_orders.all().order_by('-date')
 
+    # Raktárkészlet (hibatűréssel, ha még nincs inventory relation)
     try:
         inventory = project.inventory.all().order_by('name')
     except AttributeError:
         inventory = []
 
+    # --- 2. SZŰRÉS ---
     if request.GET.get('expense_category_filter'):
         expenses = expenses.filter(category=request.GET.get('expense_category_filter'))
 
     if request.GET.get('munkanem_filter'):
         tasks = tasks.filter(munkanem__nev=request.GET.get('munkanem_filter'))
 
+    # Listák a legördülőkhöz
     munkanem_list = Munkanem.objects.all().order_by('nev')
-    expense_category_list = Expense.CATEGORY_CHOICES
+    expense_category_list = [('ANYAG', 'Anyag'), ('MUNKADIJ', 'Munkadíj'), ('EGYEB', 'Egyéb')]
 
+    # --- 3. PÉNZÜGYI ÖSSZESÍTÉS (AGGREGÁCIÓ) ---
     summ = tasks.aggregate(
         mat=Sum('anyag_osszesen'),
         ls=Sum('sajat_munkadij_osszesen'),
@@ -277,24 +301,39 @@ def project_detail(request, pk):
         hours=Sum(F('mennyiseg') * F('normaido')),
     )
 
+    # Tervezett költségek (ha nincs adat, akkor 0)
     plan_mat = summ['mat'] or 0
     plan_ls = summ['ls'] or 0
     plan_la = summ['la'] or 0
     plan_total = plan_mat + plan_ls + plan_la
 
+    # Tényleges kiadások
     spent = expenses.aggregate(s=Sum('amount_netto'))['s'] or 0
+
+    # Egyenleg (Maradék)
+    balance = plan_total - spent
+
+    # --- 4. IDŐTARTAM SZÁMÍTÁS (ITT VOLT A HIBA) ---
     hours = summ['hours'] or 0
 
-    days = 0
-    # JAVÍTVA: Division by zero elkerülése
-    hpd = project.hours_per_day or 8
+    # Biztonságos osztás: ha a hours_per_day nincs megadva, alapértelmezett 8
+    hpd = project.hours_per_day if project.hours_per_day else 8
+
+    # Itt használjuk a math modult tisztán
     if hpd > 0:
         days = math.ceil(hours / hpd)
     else:
         days = 0
 
+    # Befejezés dátuma (Munkanapok alapján)
     end_date = calculate_work_end_date(project.start_date, days)
 
+    # ÁFA és Bruttó számítás
+    vat_rate = project.vat_rate or 27
+    total_vat = plan_total * (vat_rate / 100)
+    total_project_brutto = plan_total * (1 + vat_rate / 100)
+
+    # --- 5. CONTEXT ÖSSZEÁLLÍTÁSA ---
     context = {
         'project': project,
         'tasks': tasks,
@@ -302,25 +341,31 @@ def project_detail(request, pk):
         'documents': documents,
         'orders': orders,
         'inventory': inventory,
+
+        # Pénzügy
         'plan_anyag': plan_mat,
         'plan_dij': plan_ls + plan_la,
         'plan_total': plan_total,
         'actual_total': spent,
-        'balance': plan_total - spent,
-        'vat_rate': project.vat_rate,
-        'total_vat': plan_total * (project.vat_rate / 100),
-        'total_project_brutto': plan_total * (1 + project.vat_rate / 100),
+        'balance': balance,
+        'vat_rate': vat_rate,
+        'total_vat': total_vat,
+        'total_project_brutto': total_project_brutto,
+
+        # Idő
         'total_effort_hours': hours,
         'total_workdays': days,
         'calculated_end_date': end_date,
+
+        # Szűrők és Státuszok
         'munkanem_list': munkanem_list,
         'expense_category_list': expense_category_list,
         'current_munkanem': request.GET.get('munkanem_filter'),
         'current_expense_category': request.GET.get('expense_category_filter'),
         'all_statuses': Project.STATUS_CHOICES,
     }
-    return render(request, 'projects/project_detail.html', context)
 
+    return render(request, 'projects/project_detail.html', context)
 
 @login_required
 def project_status_update(request, pk, status_code):
@@ -1469,8 +1514,69 @@ def resource_planning(request): return render(request, 'projects/placeholder.htm
 
 
 @login_required
-def hr_dashboard(request): return render(request, 'projects/placeholder.html', {'title': 'HR és Munkaügy'})
+def hr_dashboard(request):
+    # 1. Hónap kiválasztása (Alapértelmezett: aktuális hónap)
+    today = timezone.now().date()
+    selected_month_str = request.GET.get('month')
 
+    if selected_month_str:
+        try:
+            # Biztonságos dátum konverzió
+            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date()
+        except ValueError:
+            selected_date = today.replace(day=1)
+    else:
+        selected_date = today.replace(day=1)
+
+    # 2. Dolgozók lekérése
+    employees = Employee.objects.filter(status='ACTIVE')
+    payroll_data = []
+
+    for emp in employees:
+        # a) Ledolgozott órák ebben a hónapban
+        attendance_qs = Attendance.objects.filter(
+            employee=emp,
+            date__year=selected_date.year,
+            date__month=selected_date.month
+        )
+        total_hours = attendance_qs.aggregate(Sum('hours_worked'))['hours_worked__sum'] or 0
+
+        # b) Munkabér számítása (Napi bér / 8 * ledolgozott óra)
+        # Ha nincs napi bér beállítva, 0-val számolunk
+        daily_cost = emp.daily_cost or 0
+        hourly_rate = Decimal(daily_cost) / Decimal(8)
+        base_salary = Decimal(total_hours) * hourly_rate
+
+        # c) Pénzügyi tételek (Előleg, Prémium)
+        items = PayrollItem.objects.filter(
+            employee=emp,
+            date__year=selected_date.year,
+            date__month=selected_date.month
+        )
+
+        advances = items.filter(type='ADVANCE').aggregate(Sum('amount'))['amount__sum'] or 0
+        prems = items.filter(type='PREMIUM').aggregate(Sum('amount'))['amount__sum'] or 0
+        deductions = items.filter(type='DEDUCTION').aggregate(Sum('amount'))['amount__sum'] or 0
+
+        # d) Végösszeg (Alapbér + Prémium - Előleg - Levonás)
+        final_pay = base_salary + prems - advances - deductions
+
+        payroll_data.append({
+            'employee': emp,
+            'hours': total_hours,
+            'base_salary': base_salary,
+            'advances': advances,
+            'premiums': prems,
+            'deductions': deductions,
+            'final_pay': final_pay
+        })
+
+    context = {
+        'payroll_data': payroll_data,
+        'selected_date': selected_date,
+        'today': today
+    }
+    return render(request, 'projects/hr_dashboard.html', context)
 
 @login_required
 def global_inventory(request): all_items = ProjectInventory.objects.all().order_by('name'); return render(request,

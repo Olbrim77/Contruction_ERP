@@ -1,0 +1,140 @@
+{% extends 'projects/base.html' %}
+
+{% block title %}Bejelentkezés{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Teljes képernyős középigazítás a login doboznak */
+    .login-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh; /* A képernyő 80%-a */
+        background-color: #f4f6f9;
+    }
+
+    /* A bejelentkező kártya */
+    .login-card {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        border-top: 5px solid #005a9c; /* Céges kék szín */
+    }
+
+    /* Űrlap elemek */
+    .form-group {
+        margin-bottom: 20px;
+        text-align: left;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+        display: block;
+        font-size: 0.9rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 16px;
+        box-sizing: border-box; /* Fontos a padding miatt */
+        transition: border-color 0.3s;
+    }
+
+    .form-input:focus {
+        border-color: #005a9c;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 90, 156, 0.1);
+    }
+
+    /* Gomb */
+    .btn-login {
+        width: 100%;
+        background-color: #005a9c;
+        color: white;
+        padding: 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        margin-top: 10px;
+    }
+
+    .btn-login:hover {
+        background-color: #00447c;
+    }
+
+    /* Hibaüzenet doboz */
+    .error-box {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 12px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-size: 0.9rem;
+        border: 1px solid #f5c6cb;
+        text-align: left;
+    }
+
+    .footer-text {
+        margin-top: 25px;
+        font-size: 0.85rem;
+        color: #888;
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+    <div class="login-card">
+
+        <h2 style="color: #005a9c; margin: 0 0 10px 0;">🏗️ Építő ERP</h2>
+        <p style="color: #666; margin-bottom: 30px;">Jelentkezz be a folytatáshoz</p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="error-box">
+                    ⚠️ <strong>Sikertelen belépés!</strong><br>
+                    Kérlek, ellenőrizd a felhasználónevet és a jelszót.
+                </div>
+            {% endif %}
+
+            {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
+
+            <div class="form-group">
+                <label for="id_username" class="form-label">Felhasználónév</label>
+                <input type="text" name="username" id="id_username" class="form-input" placeholder="pl. admin" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="id_password" class="form-label">Jelszó</label>
+                <input type="password" name="password" id="id_password" class="form-input" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-login">
+                Belépés ➜
+            </button>
+        </form>
+
+        <div class="footer-text">
+            © 2025 Kocsis Építő Kft.<br>
+            Nincs fiókod? Kérd a rendszergazdát!
+        </div>
+    </div>
+</div>
+{% endblock %}
