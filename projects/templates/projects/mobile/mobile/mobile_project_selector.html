@@ -3,52 +3,125 @@
 {% block title %}Válassz Projektet{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-    .mobile-container { max-width: 600px; margin: 0 auto; padding: 20px; background: #fff; min-height: 100vh; }
-    .list-header { margin-bottom: 20px; text-align: center; }
-    .list-header h2 { margin: 0; color: #333; }
+    /* --- A TE DIZÁJNOD ALAPJÁN --- */
+    body {
+        background-color: #f0f2f5;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 0; color: #333;
+    }
+    .mobile-container {
+        max-width: 600px; margin: 0 auto; background: #fff;
+        min-height: 100vh; padding: 15px;
+        display: flex; flex-direction: column;
+    }
 
-    .project-list { list-style: none; padding: 0; }
+    /* Fejléc */
+    .header-row {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;
+    }
+    .header-row h2 { margin: 0; color: #005a9c; font-size: 1.4rem; }
+    .back-link { text-decoration: none; color: #666; font-weight: bold; font-size: 0.9rem; }
 
-    .project-item {
+    /* Keresőmező (Input stílusod) */
+    .search-box {
+        width: 100%; padding: 12px; border: 1px solid #ccc;
+        border-radius: 8px; font-size: 16px; background: #f8f9fa;
+        margin-bottom: 20px; box-sizing: border-box; font-family: inherit;
+    }
+    .search-box:focus { border-color: #005a9c; outline: none; background: #fff; }
+
+    /* Projekt Lista */
+    .project-list {
+        list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 15px;
+    }
+
+    /* Kártya Stílus (Card-Box átalakítva kattinthatóvá) */
+    .project-card {
         display: block;
         background: #fff;
-        padding: 20px;
         border: 1px solid #e1e4e8;
         border-radius: 12px;
-        margin-bottom: 15px;
+        padding: 20px;
         text-decoration: none;
         color: #333;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        transition: background 0.1s;
+        transition: transform 0.1s, background-color 0.2s;
+        position: relative;
     }
-    .project-item:active { background-color: #f8f9fa; transform: scale(0.98); }
 
-    .p-title { font-weight: bold; font-size: 1.1rem; color: #005a9c; display: block; margin-bottom: 5px; }
-    .p-loc { font-size: 0.9rem; color: #666; }
+    .project-card:active {
+        transform: scale(0.98);
+        background-color: #f0f8ff;
+        border-color: #005a9c;
+    }
 
-    .back-btn { display: inline-block; margin-bottom: 20px; color: #666; text-decoration: none; font-weight: bold; }
+    /* Kártya tartalma */
+    .p-name { font-size: 1.1rem; font-weight: bold; color: #005a9c; display: block; margin-bottom: 5px; }
+    .p-loc { font-size: 0.9rem; color: #555; display: flex; align-items: center; gap: 6px; }
+    .p-status {
+        position: absolute; top: 20px; right: 20px;
+        font-size: 0.75rem; background: #eee; padding: 3px 8px; border-radius: 10px; color: #666;
+    }
+
+    /* Ikon a jobb szélen */
+    .arrow-icon {
+        position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+        color: #ccc; font-size: 1.2rem;
+    }
+
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="mobile-container">
-    <a href="{% url 'mobile-dashboard' %}" class="back-btn">⬅ Vissza</a>
 
-    <div class="list-header">
+    <div class="header-row">
+        <a href="{% url 'mobile-dashboard' %}" class="back-link">⬅ Mégse</a>
         <h2>Válassz Projektet</h2>
-        <p>Melyik projekten dolgozol?</p>
+        <div style="width: 40px;"></div>
     </div>
 
-    <div class="project-list">
+    <input type="text" id="searchProject" class="search-box" placeholder="🔍 Keresés a projektek között..." onkeyup="filterProjects()">
+
+    <div class="project-list" id="projectList">
         {% for p in projects %}
-            <a href="{% if action_type == 'log' %}{% url 'mobile-daily-log' p.id %}{% else %}{% url 'mobile-attendance' p.id %}{% endif %}" class="project-item">
-                <span class="p-title">{{ p.name }}</span>
-                <span class="p-loc">📍 {{ p.location|truncatechars:35 }}</span>
+            <a href="{% if action_type == 'log' %}{% url 'daily-log-create' p.id %}{% elif action_type == 'attendance' %}{% url 'mobile-attendance' p.id %}{% elif action_type == 'doc' %}{% url 'document-create' p.id %}{% endif %}"
+               class="project-card" data-name="{{ p.name|lower }}">
+
+                <span class="p-name">{{ p.name }}</span>
+                <div class="p-loc"><i class="fa-solid fa-location-dot"></i> {{ p.location|truncatechars:30 }}</div>
+
+                <i class="fa-solid fa-chevron-right arrow-icon"></i>
             </a>
         {% empty %}
-            <p style="text-align:center; color:#999;">Nincs aktív projekt.</p>
+            <div style="text-align:center; padding:40px; color:#999;">
+                <i class="fa-solid fa-folder-open" style="font-size:3rem; margin-bottom:10px;"></i>
+                <p>Nincs aktív projekt.</p>
+            </div>
         {% endfor %}
     </div>
+
 </div>
+
+<script>
+    // Egyszerű kliens oldali szűrő
+    function filterProjects() {
+        var input = document.getElementById('searchProject');
+        var filter = input.value.toLowerCase();
+        var list = document.getElementById("projectList");
+        var cards = list.getElementsByClassName('project-card');
+
+        for (var i = 0; i < cards.length; i++) {
+            var name = cards[i].getAttribute('data-name');
+            if (name.indexOf(filter) > -1) {
+                cards[i].style.display = "";
+            } else {
+                cards[i].style.display = "none";
+            }
+        }
+    }
+</script>
 {% endblock %}

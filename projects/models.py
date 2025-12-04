@@ -377,46 +377,49 @@ class PublicHoliday(models.Model):
 
 
 class Attendance(models.Model):
-    """ JELENLÉTI ÍV (NAPI STÁTUSSZAL) """
+    # --- STÁTUSZOK (A HTML űrlap alapján) ---
     STATUS_CHOICES = [
-        ('WORK', '✅ Jelen (Munka)'),
-        ('SZ', '🟢 Fizetett Szabadság'),
-        ('B', '🔴 Betegszabadság'),
-        ('F', '⚪ Fizetés nélküli'),
-        ('I', '⚫ Igazolatlan'),
-        ('K', '🔵 Kiküldetés / Külföld'),
-        ('TP', '📚 Tanulmányi szabadság'),
-        ('CS', '⏳ Csúsztatás')
+        ('WORK', '✅ Munkavégzés történt'),
+        ('WEATHER', '🌧️ Időjárás miatt állás'),
+        ('SICK', '🤒 Betegszabadság'),
+        ('ABSENCE', '🚨 Rendkívüli távollét'),
+        ('OTHER', '❓ Egyéb ok'),
     ]
 
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Dolgozó")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, verbose_name="Munkaterület", null=True,
-                                blank=True)  # Nullable, ha pl. beteg
+                                blank=True)  # Nullable, mert betegség esetén nincs projekt
     date = models.DateField(default=timezone.now, verbose_name="Dátum")
 
-    # Státusz (Alapértelmezett: Munka)
-    status = models.CharField(max_length=5, choices=STATUS_CHOICES, default='WORK', verbose_name="Típus")
+    # Státusz mező
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='WORK', verbose_name="Tevékenység")
 
-    start_time = models.TimeField(default="07:00", verbose_name="Kezdés")
-    end_time = models.TimeField(default="16:00", verbose_name="Befejezés")
+    # Munka adatok (Csak WORK esetén)
+    start_time = models.TimeField(null=True, blank=True, verbose_name="Kezdés")
+    end_time = models.TimeField(null=True, blank=True, verbose_name="Befejezés")
     hours_worked = models.DecimalField(max_digits=4, decimal_places=1, default=0, verbose_name="Ledolgozott óra")
 
+    # Pótlékok
     is_driver = models.BooleanField(default=False, verbose_name="Sofőr")
     is_abroad = models.BooleanField(default=False, verbose_name="Külföld")
 
+    # GPS
     gps_lat = models.CharField(max_length=50, blank=True, null=True)
     gps_lon = models.CharField(max_length=50, blank=True, null=True)
-    check_in_photo = models.ImageField(upload_to='attendance_photos/%Y/%m/', blank=True, null=True)
+
+    # Igazolás (Csak SICK esetén)
+    sick_paper = models.FileField(upload_to='sick_papers/%Y/', blank=True, null=True, verbose_name="Orvosi igazolás")
+
+    # Megjegyzés (ABSENCE/OTHER esetén kötelező)
+    note = models.TextField(blank=True, verbose_name="Megjegyzés")
 
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)  # Utolsó módosítás ideje
 
     class Meta:
         verbose_name = "Jelenlét";
         verbose_name_plural = "Jelenléti Ívek";
         ordering = ['-date']
         unique_together = ('employee', 'date')
-
 
 class AttendanceAuditLog(models.Model):
     """ AUDIT NAPLÓ: KI, MIKOR, MIT MÓDOSÍTOTT? """
@@ -520,3 +523,84 @@ class LeaveRequest(models.Model):
         ordering = ['-created_at']
         verbose_name = "Szabadság Kérelem"
         verbose_name_plural = "Szabadság Kérelmek"
+
+    # --- 8. ANYAG ÉS ESZKÖZ IGÉNYLÉS (Napi Naplóhoz) ---
+
+
+
+
+class LogRequest(models.Model):
+    """ A napi naplóban leadott igénylések """
+
+    # JAVÍTOTT LISTA:
+    TYPE_CHOICES = [
+        ('ANYAG', '🧱 Anyag'),
+        ('ESZKOZ', '🔨 Eszköz / Gép'),
+        ('SZAKIPAR', '👷 Szakipar'),
+        ('SUPPORT', '📐 Műszaki támogatás'),
+    ]
+
+    STATUS_CHOICES = [
+        ('PENDING', '⏳ Függőben'),
+        ('ORDERED', '🛒 Megrendelve'),
+        ('DELIVERED', '✅ Szállítva / Teljesítve'),
+        ('REJECTED', '❌ Elutasítva'),
+    ]
+
+    daily_log = models.ForeignKey('DailyLog', on_delete=models.CASCADE, related_name='requests', verbose_name="Napló")
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='ANYAG', verbose_name="Típus")
+
+    # A "név" mezőben fogjuk tárolni a teljes szöveget (pl. "10 zsák cement")
+    name = models.CharField(max_length=200, verbose_name="Igény leírása")
+
+    # Ezeket megtartjuk az adatbázis integritás miatt, de üresen maradhatnak
+    quantity = models.CharField(max_length=50, blank=True, verbose_name="Mennyiség")
+    description = models.TextField(blank=True, verbose_name="Részletes leírás")
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING', verbose_name="Státusz")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return f"{self.get_type_display()}: {self.name}"
+
+    class Meta: verbose_name = "Igénylés"; verbose_name_plural = "Igénylések"
+
+
+# --- 9. HIERARCHIKUS TERVTÁR (Doksi fülhöz) ---
+
+
+class PlanCategory(models.Model):
+    """Mappák a terveknek (pl. Kivitelezési tervek -> Építészet)"""
+    project = models.ForeignKey('Project', on_delete=models.CASCADE, related_name='plan_categories')
+    name = models.CharField(max_length=100, verbose_name="Mappa neve")
+    # Önmagára hivatkozik, így lehetnek almappák!
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True,
+                               related_name='subcategories', verbose_name="Szülő mappa")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Terv Mappa"
+        verbose_name_plural = "Terv Mappák"
+
+
+class PlanDocument(models.Model):
+    """Maguk a fájlok a mappákban"""
+    category = models.ForeignKey(PlanCategory, on_delete=models.CASCADE, related_name='files', verbose_name="Mappa")
+    name = models.CharField(max_length=200, verbose_name="Dokumentum neve")
+    file = models.FileField(upload_to='plans/%Y/%m/', verbose_name="Fájl")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    # Segédfüggvény a kiterjesztéshez (ikonozáshoz)
+    @property
+    def extension(self):
+        import os
+        name, ext = os.path.splitext(self.file.name)
+        return ext.lower()
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Tervrajz"
+        verbose_name_plural = "Tervrajzok"

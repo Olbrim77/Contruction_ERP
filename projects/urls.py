@@ -104,5 +104,5 @@ path('mobile/project/<int:project_id>/attendance/', views_mobile.mobile_attendan
 
 path('mobile/select-project/<str:action_type>/', views_mobile.mobile_project_selector, name='mobile-project-select'),
 
-
+path('mobile/select-project/<str:action_type>/', views_mobile.mobile_project_selector, name='mobile-project-select'),
 ]

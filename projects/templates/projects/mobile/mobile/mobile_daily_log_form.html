@@ -1,7 +1,7 @@
 {% extends 'projects/base.html' %}
 {% load humanize %}
 
-{% block title %}Napi Napló{% endblock %}
+{% block title %}Napi Napló - {{ project.name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,7 +15,7 @@
     .header-row h2 { margin: 0; color: #005a9c; font-size: 1.2rem; }
     .back-link { text-decoration: none; color: #666; font-weight: bold; font-size: 0.9rem; }
 
-    /* --- FÜLEK --- */
+    /* --- TAB BAR --- */
     .tab-nav { display: flex; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow-x: auto; white-space: nowrap; position: sticky; top: 55px; z-index: 15; scrollbar-width: none; }
     .tab-nav::-webkit-scrollbar { display: none; }
     .tab-btn { flex: 1; min-width: 75px; padding: 12px 5px; text-align: center; cursor: pointer; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
@@ -29,29 +29,14 @@
     .tab-pane.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* --- KÁRTYÁK ÉS INPUTOK --- */
+    /* --- STÍLUSOK --- */
     .card-box { border: 1px solid #e1e4e8; border-radius: 12px; padding: 15px; background: #f8f9fa; margin-bottom: 15px; }
     label { display: block; font-weight: bold; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
     input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; background: #fff; }
-    input:focus, textarea:focus, select:focus { border-color: #005a9c; outline: none; }
 
-    /* --- IDŐJÁRÁS --- */
-    .weather-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
-    .weather-option { text-align: center; padding: 10px 5px; background: #fff; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; }
-    .weather-option.selected { background-color: #e3f2fd; border-color: #005a9c; color: #005a9c; }
-    .btn-auto-weather { width: 100%; padding: 12px; background: #17a2b8; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-
-    /* --- IGÉNYLÉS --- */
-    .req-item { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; border-left: 5px solid #ccc; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-    .req-title { font-weight: bold; font-size: 1rem; display: block; }
-    .req-meta { font-size: 0.8rem; color: #666; }
-    .req-badge { font-size: 0.7rem; text-transform: uppercase; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: #eee; color: #555; margin-right: 5px; }
-    .type-ANYAG { border-left-color: #ffc107; } .type-ESZKOZ { border-left-color: #6c757d; }
-    .type-SZAKIPAR { border-left-color: #17a2b8; } .type-SUPPORT { border-left-color: #dc3545; }
-
-    /* --- TERVTÁR --- */
+    /* TERVTÁR STÍLUSOK */
     .tree-container { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; margin-bottom: 20px; }
-    .tree-folder { display: flex; align-items: center; padding: 12px 10px; cursor: pointer; border-bottom: 1px solid #f5f5f5; font-weight: bold; }
+    .tree-folder { display: flex; align-items: center; padding: 12px 10px; cursor: pointer; border-radius: 6px; font-weight: bold; color: #333; border-bottom: 1px solid #f5f5f5; }
     .folder-icon { color: #ffc107; margin-right: 10px; font-size: 1.3rem; }
     .folder-arrow { margin-left: auto; color: #999; transition: transform 0.2s; }
     .tree-folder.open .folder-arrow { transform: rotate(90deg); }
@@ -59,21 +44,33 @@
     .tree-children.show { display: block; }
     .tree-file { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f9f9f9; }
     .file-icon { color: #6c757d; margin-right: 10px; font-size: 1.2rem; }
-    .file-name { flex-grow: 1; font-size: 0.9rem; color: #555; overflow: hidden; text-overflow: ellipsis; }
-    .btn-download { color: #005a9c; background: #e3f2fd; padding: 8px; border-radius: 6px; }
+    .file-name { flex-grow: 1; font-size: 0.9rem; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-download { color: #005a9c; background: #e3f2fd; padding: 8px; border-radius: 6px; text-decoration: none; font-size: 1rem; }
 
-    /* --- GOMBOK --- */
-    .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 15px; background: #fff; border-top: 1px solid #eee; max-width: 600px; margin: 0 auto; z-index: 30; }
+    /* IGÉNYLÉS */
+    .req-item { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; border-left: 5px solid #ccc; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .req-title { font-weight: bold; font-size: 1rem; display: block; }
+    .req-meta { font-size: 0.8rem; color: #666; }
+    .req-badge { font-size: 0.7rem; text-transform: uppercase; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: #eee; color: #555; margin-right: 5px; }
+    .type-ANYAG { border-left-color: #ffc107; } .type-ESZKOZ { border-left-color: #6c757d; }
+    .type-SZAKIPAR { border-left-color: #17a2b8; } .type-SUPPORT { border-left-color: #dc3545; }
+
+    /* EGYÉB */
+    .weather-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+    .weather-option { text-align: center; padding: 10px 5px; background: #fff; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; }
+    .weather-option.selected { background-color: #e3f2fd; border-color: #005a9c; color: #005a9c; }
+    .btn-auto-weather { width: 100%; padding: 12px; background: #17a2b8; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .btn-save { width: 100%; padding: 15px; background: #005a9c; color: white; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; cursor: pointer; }
-    .btn-add-field { width: 100%; padding: 10px; margin-top: 10px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .btn-remove { color: #dc3545; background: none; border: none; font-size: 1.2rem; cursor: pointer; }
-    .dynamic-list { display: flex; flex-direction: column; gap: 10px; }
-    .dynamic-row { display: flex; gap: 10px; align-items: center; }
-
+    .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 15px; background: #fff; border-top: 1px solid #eee; max-width: 600px; margin: 0 auto; z-index: 30; }
+    .dynamic-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .btn-remove { color: red; cursor: pointer; font-size: 1.2rem; padding: 5px; }
+    .btn-add-field { width: 100%; padding: 10px; background: #eee; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .upload-box { border: 2px dashed #ccc; padding: 25px; text-align: center; background: #fff; border-radius: 8px; cursor: pointer; transition: 0.2s; }
 </style>
 {% endblock %}
 
 {% block content %}
+
 <div class="mobile-container">
 
     <div class="header-row">
@@ -121,68 +118,18 @@
         </div>
 
         <div id="tab-2" class="tab-pane">
-
-            <button type="button" class="btn-auto-weather" onclick="fetchWeatherData()" id="weather-btn">
-                <i class="fa-solid fa-location-crosshairs"></i> Adatok betöltése helyszín alapján
-            </button>
-
             <div class="card-box">
-                <label style="margin-bottom:10px;">Égkép</label>
+                <label>Égkép</label>
                 <input type="hidden" name="weather" id="weather_status" value="NAPOS">
-
                 <div class="weather-grid">
-                    <div class="weather-option selected" data-val="NAPOS" onclick="selectWeather(this)">
-                        <i class="fa-solid fa-sun"></i><span>Napos</span>
-                    </div>
-                    <div class="weather-option" data-val="FELHOS" onclick="selectWeather(this)">
-                        <i class="fa-solid fa-cloud"></i><span>Felhős</span>
-                    </div>
-                    <div class="weather-option" data-val="BORUS" onclick="selectWeather(this)">
-                        <i class="fa-solid fa-smog"></i><span>Borús</span>
-                    </div>
-                    <div class="weather-option" data-val="ESOS" onclick="selectWeather(this)">
-                        <i class="fa-solid fa-cloud-rain"></i><span>Esős</span>
-                    </div>
-                    <div class="weather-option" data-val="VIHAR" onclick="selectWeather(this)">
-                        <i class="fa-solid fa-bolt"></i><span>Viharos</span>
-                    </div>
-                    <div class="weather-option" data-val="HAVAZAS" onclick="selectWeather(this)">
-                        <i class="fa-regular fa-snowflake"></i><span>Havazás</span>
-                    </div>
+                    <div class="weather-option selected" onclick="selectWeather(this, 'NAPOS')"><i class="fa-solid fa-sun"></i>Napos</div>
+                    <div class="weather-option" onclick="selectWeather(this, 'FELHOS')"><i class="fa-solid fa-cloud"></i>Felhős</div>
+                    <div class="weather-option" onclick="selectWeather(this, 'ESOS')"><i class="fa-solid fa-cloud-showers-heavy"></i>Esős</div>
                 </div>
             </div>
-
             <div class="card-box">
-                <label><i class="fa-solid fa-temperature-half"></i> Hőmérséklet (°C)</label>
-                <div class="input-row">
-                    <div>
-                        <label style="font-size:0.8rem; color:#666;">Éjszakai</label>
-                        <input type="number" name="temp_night" id="temp_night" placeholder="pl. 5">
-                    </div>
-                    <div>
-                        <label style="font-size:0.8rem; color:#666;">Nappali</label>
-                        <input type="number" name="temp_day" id="temp_day" placeholder="pl. 15">
-                    </div>
-                </div>
-            </div>
-
-            <div class="card-box">
-                <label><i class="fa-solid fa-wind"></i> Szél</label>
-                <div class="input-row">
-                    <div>
-                        <label style="font-size:0.8rem; color:#666;">Erősség (km/h)</label>
-                        <input type="number" name="wind_speed" id="wind_speed" placeholder="pl. 10">
-                    </div>
-                    <div>
-                        <label style="font-size:0.8rem; color:#666;">Irány</label>
-                        <input type="text" name="wind_dir" id="wind_dir" placeholder="pl. Észak">
-                    </div>
-                </div>
-            </div>
-
-            <div class="card-box">
-                <label>Egyéb megjegyzés az időjárásról</label>
-                <textarea name="weather_note" rows="2" placeholder="Pl. Erős szél miatt daruzás leállítva..."></textarea>
+                <label>Leírás</label>
+                <textarea name="weather_note" rows="3" placeholder="Hőmérséklet, szél, egyéb..."></textarea>
             </div>
         </div>
 
@@ -200,25 +147,20 @@
 
         <div id="tab-5" class="tab-pane">
             <div class="card-box" style="border: 1px solid #005a9c;">
-                <label><i class="fa-solid fa-plus-circle"></i> Új Igény rögzítése</label>
-
-                <select id="req_type" style="font-weight:bold; color:#005a9c; margin-bottom: 15px;">
-                    <option value="ANYAG">🧱 Anyag</option>
-                    <option value="ESZKOZ">🔨 Eszköz / Gép</option>
-                    <option value="SZAKIPAR">👷 Szakipar</option>
-                    <option value="SUPPORT">📐 Műszaki támogatás</option>
+                <label><i class="fa-solid fa-plus-circle"></i> Új Igény</label>
+                <select id="req_type" style="font-weight:bold; color:#005a9c;">
+                    <option value="ANYAG">Anyag</option>
+                    <option value="ESZKOZ">Eszköz</option>
                 </select>
-
-                <label style="font-size:0.9em; color:#666;">Mit szeretnél igényelni?</label>
-                <textarea id="req_text" rows="3" placeholder="Pl. 10 zsák cement, vagy Daru holnap reggelre..."></textarea>
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin:10px 0;">
+                    <input type="text" id="req_name" placeholder="Név">
+                    <input type="text" id="req_qty" placeholder="Menny.">
+                </div>
+                <input type="hidden" name="requests_json" id="requests_json">
 
                 <button type="button" class="btn-add-field" style="background:#005a9c; color:white;" onclick="addRequest()">+ Hozzáadás a listához</button>
             </div>
-
-            <label style="margin-left:5px;">Rögzített igények:</label>
             <div id="request_list_container"></div>
-
-            <input type="hidden" name="requests_json" id="requests_json">
         </div>
 
         <div id="tab-6" class="tab-pane">
@@ -310,24 +252,49 @@
 
     // Igénylés lista (Kliens oldali)
     let requests = [];
+
     function addRequest() {
-        const type = document.getElementById('req_type').value;
-        const name = document.getElementById('req_name').value;
-        const qty = document.getElementById('req_qty').value;
+        const typeSelect = document.getElementById('req_type');
+        const typeCode = typeSelect.value;
+        // A kiválasztott opció szövege (ikon nélkül)
+        const typeText = typeSelect.options[typeSelect.selectedIndex].text.replace(/[^a-zA-ZáéíóöőúüűÁÉÍÓÖŐÚÜŰ\s]/g, '').trim();
 
-        if(!name) return alert("Név kötelező!");
+        const text = document.getElementById('req_text').value;
 
+        if(!text) { alert('Kérlek írd be, mit szeretnél!'); return; }
+
+        const container = document.getElementById('request_list_container');
         const div = document.createElement('div');
-        div.className = `req-item type-${type}`;
-        div.innerHTML = `<div><span class="req-badge">${type}</span><b>${name}</b> (${qty})</div>`;
-        document.getElementById('request_list_container').prepend(div);
+        div.className = `req-item type-${typeCode}`;
 
-        // Adat mentése JSON-ba (hogy a szerver megkapja)
-        requests.push({type: type, name: name, quantity: qty});
+        div.innerHTML = `
+            <div>
+                <span class="req-badge">${typeText}</span>
+                <span class="req-title" style="font-weight:normal;">${text}</span>
+            </div>
+            <button type="button" class="btn-remove" onclick="removeRequest(this, '${text}')">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        `;
+        container.prepend(div);
+
+        // Adat mentése JSON-ba (csak típus és szöveg)
+        requests.push({type: typeCode, text: text});
+        updateJson();
+
+        document.getElementById('req_text').value = '';
+    }
+
+    function removeRequest(btn, textToRemove) {
+        // Törlés a tömbből
+        requests = requests.filter(r => r.text !== textToRemove);
+        updateJson();
+        // Törlés a DOM-ból
+        btn.parentElement.remove();
+    }
+
+    function updateJson() {
         document.getElementById('requests_json').value = JSON.stringify(requests);
-
-        document.getElementById('req_name').value = '';
-        document.getElementById('req_qty').value = '';
     }
 
     // Tabok és Mappák
@@ -346,100 +313,22 @@
         el.classList.add('selected');
         document.getElementById('weather_status').value = val;
     }
-    // --- IDŐJÁRÁS API LOGIKA ---
 
-    function selectWeather(element) {
-        // Összesről levesszük a kiválasztást
-        document.querySelectorAll('.weather-option').forEach(e => e.classList.remove('selected'));
-        // Az aktuálisra rátesszük
-        element.classList.add('selected');
-        // Beírjuk az értéket a rejtett mezőbe
-        document.getElementById('weather_status').value = element.getAttribute('data-val');
-    }
-
+    // Időjárás API
     function fetchWeatherData() {
         var btn = document.getElementById("weather-btn");
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Lekérés folyamatban...';
-
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(function(pos) {
-                var lat = pos.coords.latitude;
-                var lon = pos.coords.longitude;
-
-                // Open-Meteo API hívás (ingyenes, nem kell kulcs)
-                var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
-
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        // 1. Hőmérséklet (Mai napi min/max)
-                        if(data.daily) {
-                            var minTemp = data.daily.temperature_2m_min[0];
-                            var maxTemp = data.daily.temperature_2m_max[0];
-                            document.getElementById("temp_night").value = minTemp;
-                            document.getElementById("temp_day").value = maxTemp;
-                        }
-
-                        // 2. Szél
-                        if(data.current_weather) {
-                            var windSpeed = data.current_weather.windspeed;
-                            var windDir = data.current_weather.winddirection;
-                            document.getElementById("wind_speed").value = windSpeed;
-                            document.getElementById("wind_dir").value = getCardinalDirection(windDir);
-
-                            // 3. Égkép (WMO kód alapján)
-                            var code = data.current_weather.weathercode;
-                            autoSelectWeatherIcon(code);
-                        }
-
-                        btn.innerHTML = '<i class="fa-solid fa-check"></i> Adatok betöltve!';
-                        btn.style.backgroundColor = "#28a745";
-
-                        // 2 másodperc múlva visszaáll az eredeti szövegre
-                        setTimeout(() => {
-                             btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> Adatok betöltése helyszín alapján';
-                             btn.style.backgroundColor = "#17a2b8";
-                        }, 2000);
-                    })
-                    .catch(err => {
-                        alert("Hiba az időjárás lekérésekor: " + err);
-                        btn.innerHTML = "Újrapróbál";
-                    });
-            }, function(err) {
-                alert("Nem sikerült a GPS pozíció lekérése. Engedélyezd a helymeghatározást!");
-                btn.innerHTML = "GPS Hiba";
+                var url = `https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+                fetch(url).then(r => r.json()).then(d => {
+                    document.getElementById("temp_night").value = d.daily.temperature_2m_min[0];
+                    document.getElementById("temp_day").value = d.daily.temperature_2m_max[0];
+                    btn.innerHTML = '✅ Kész';
+                    btn.style.background = '#28a745';
+                });
             });
-        } else {
-            alert("Nincs GPS hozzáférés a böngészőben.");
         }
-    }
-
-    // Segéd: Szélirány fok -> Szöveg konverzió
-    function getCardinalDirection(angle) {
-        const directions = ['Észak', 'Északkelet', 'Kelet', 'Délkelet', 'Dél', 'Délnyugat', 'Nyugat', 'Északnyugat'];
-        return directions[Math.round(angle / 45) % 8];
-    }
-
-    // Segéd: WMO Kód -> Ikon kiválasztása
-    function autoSelectWeatherIcon(code) {
-        var type = "NAPOS";
-        // WMO kódok egyszerűsítve (0-99)
-        if (code <= 1) type = "NAPOS";
-        else if (code <= 3) type = "FELHOS";
-        else if (code == 45 || code == 48) type = "BORUS";
-        else if (code >= 51 && code <= 67) type = "ESOS"; // Eső
-        else if (code >= 71 && code <= 77) type = "HAVAZAS"; // Hó
-        else if (code >= 80 && code <= 82) type = "ESOS"; // Zápor
-        else if (code >= 85 && code <= 86) type = "HAVAZAS"; // Hózápor
-        else if (code >= 95) type = "VIHAR"; // Zivatar
-
-        // Megkeressük a megfelelő div-et és rákattintunk virtuálisan
-        var options = document.querySelectorAll('.weather-option');
-        options.forEach(opt => {
-            if(opt.getAttribute('data-val') === type) {
-                selectWeather(opt);
-            }
-        });
     }
 </script>
 
