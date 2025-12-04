@@ -1,0 +1,58 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; }
+      h1 { font-size: 18px; color:#005a9c; }
+      table { width:100%; border-collapse: collapse; }
+      th, td { border: 1px solid #ccc; padding: 6px; font-size: 11px; }
+      th { background: #f2f2f2; }
+      .right { text-align: right; }
+      .totals { margin: 10px 0; }
+      .pill { display:inline-block; border:1px solid #ddd; background:#f7f7f7; padding:4px 8px; margin-right:6px; }
+    </style>
+    <title>Bérszámfejtés – {{ selected_date|date:"Y. F" }}</title>
+</head>
+<body>
+  <h1>Bérszámfejtés – {{ selected_date|date:"Y. F" }}</h1>
+
+  <div class="totals">
+    <span class="pill">Előleg: <strong>{{ totals.ADVANCE|floatformat:0|intcomma }} Ft</strong></span>
+    <span class="pill">Prémium: <strong>{{ totals.PREMIUM|floatformat:0|intcomma }} Ft</strong></span>
+    <span class="pill">Levonás: <strong>{{ totals.DEDUCTION|floatformat:0|intcomma }} Ft</strong></span>
+    <span class="pill">Kölcsön: <strong>{{ totals.LOAN|floatformat:0|intcomma }} Ft</strong></span>
+    <span class="pill">Nettó hatás: <strong>{{ totals.NET|floatformat:0|intcomma }} Ft</strong></span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Dátum</th>
+        <th>Dolgozó</th>
+        <th>Típus</th>
+        <th>Megjegyzés</th>
+        <th class="right">Összeg (Ft)</th>
+        <th>Jóváhagyva</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.date|date:'Y.m.d.' }}</td>
+        <td>{{ it.employee.name }}</td>
+        <td>{{ it.get_type_display }}</td>
+        <td>{{ it.note }}</td>
+        <td class="right">{{ it.amount|floatformat:0|intcomma }}</td>
+        <td>{% if it.approved %}Igen{% else %}Nem{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" style="text-align:center;">Nincs tétel.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

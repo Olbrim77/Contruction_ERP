@@ -527,35 +527,35 @@ class LeaveRequest(models.Model):
     # --- 8. ANYAG ÉS ESZKÖZ IGÉNYLÉS (Napi Naplóhoz) ---
 
 
+# projects/models.py - A FÁJL VÉGÉRE ILLESZD BE:
 
+# --- 8. ANYAG ÉS ESZKÖZ IGÉNYLÉS (Napi Naplóhoz) ---
 
 class LogRequest(models.Model):
     """ A napi naplóban leadott igénylések """
-
-    # JAVÍTOTT LISTA:
     TYPE_CHOICES = [
         ('ANYAG', '🧱 Anyag'),
         ('ESZKOZ', '🔨 Eszköz / Gép'),
         ('SZAKIPAR', '👷 Szakipar'),
-        ('SUPPORT', '📐 Műszaki támogatás'),
+        ('SUPPORT', '📐 Műszaki Támogatás'),
     ]
 
     STATUS_CHOICES = [
         ('PENDING', '⏳ Függőben'),
         ('ORDERED', '🛒 Megrendelve'),
-        ('DELIVERED', '✅ Szállítva / Teljesítve'),
+        ('DELIVERED', '✅ Teljesítve'),
         ('REJECTED', '❌ Elutasítva'),
     ]
 
     daily_log = models.ForeignKey('DailyLog', on_delete=models.CASCADE, related_name='requests', verbose_name="Napló")
+
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='ANYAG', verbose_name="Típus")
 
-    # A "név" mezőben fogjuk tárolni a teljes szöveget (pl. "10 zsák cement")
-    name = models.CharField(max_length=200, verbose_name="Igény leírása")
+    # Mivel összevontuk a mezőket, a 'name' tárolja a teljes szöveget (pl. "10 zsák cement")
+    name = models.CharField(max_length=255, verbose_name="Igény leírása")
 
-    # Ezeket megtartjuk az adatbázis integritás miatt, de üresen maradhatnak
-    quantity = models.CharField(max_length=50, blank=True, verbose_name="Mennyiség")
-    description = models.TextField(blank=True, verbose_name="Részletes leírás")
+    # Technikai mezők (ha később mégis kellene külön)
+    quantity = models.CharField(max_length=50, blank=True, null=True, verbose_name="Mennyiség")
 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING', verbose_name="Státusz")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -567,40 +567,31 @@ class LogRequest(models.Model):
 
 # --- 9. HIERARCHIKUS TERVTÁR (Doksi fülhöz) ---
 
-
 class PlanCategory(models.Model):
-    """Mappák a terveknek (pl. Kivitelezési tervek -> Építészet)"""
+    """ Mappák a terveknek (pl. Kivitelezési tervek -> Építészet) """
     project = models.ForeignKey('Project', on_delete=models.CASCADE, related_name='plan_categories')
     name = models.CharField(max_length=100, verbose_name="Mappa neve")
+
     # Önmagára hivatkozik, így lehetnek almappák!
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True,
-                               related_name='subcategories', verbose_name="Szülő mappa")
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subcategories',
+                               verbose_name="Szülő mappa")
 
-    def __str__(self):
-        return self.name
+    def __str__(self): return self.name
 
-    class Meta:
-        verbose_name = "Terv Mappa"
-        verbose_name_plural = "Terv Mappák"
+    class Meta: verbose_name = "Terv Mappa"; verbose_name_plural = "Terv Mappák"
 
 
 class PlanDocument(models.Model):
-    """Maguk a fájlok a mappákban"""
+    """ Maguk a fájlok a mappákban """
     category = models.ForeignKey(PlanCategory, on_delete=models.CASCADE, related_name='files', verbose_name="Mappa")
     name = models.CharField(max_length=200, verbose_name="Dokumentum neve")
     file = models.FileField(upload_to='plans/%Y/%m/', verbose_name="Fájl")
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
-    # Segédfüggvény a kiterjesztéshez (ikonozáshoz)
-    @property
-    def extension(self):
-        import os
-        name, ext = os.path.splitext(self.file.name)
-        return ext.lower()
+    def __str__(self): return self.name
 
-    def __str__(self):
-        return self.name
+    class Meta: verbose_name = "Tervrajz"; verbose_name_plural = "Tervrajzok"
 
-    class Meta:
-        verbose_name = "Tervrajz"
-        verbose_name_plural = "Tervrajzok"
+
+# (Removed duplicate definitions of LogRequest, PlanCategory, and PlanDocument to prevent
+# model re-registration and self-referential FK resolution errors.)

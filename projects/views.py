@@ -21,6 +21,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import get_template
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 
 # Modellek importálása (HR modellekkel bővítve)
@@ -1517,66 +1518,67 @@ def resource_planning(request): return render(request, 'projects/placeholder.htm
 
 @login_required
 def hr_dashboard(request):
-    # 1. Hónap kiválasztása (Alapértelmezett: aktuális hónap)
+    """HR áttekintő irányítópult havi bontásban.
+
+    - Hónap választás: ?month=YYYY-MM, alapértelmezetten az aktuális hónap első napja.
+    - Visszatér: hr_stats lista a sablonhoz (employee, hours, wage, advances, payable) + selected_date.
+    """
     today = timezone.now().date()
     selected_month_str = request.GET.get('month')
 
     if selected_month_str:
         try:
-            # Biztonságos dátum konverzió
-            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date()
+            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date().replace(day=1)
         except ValueError:
             selected_date = today.replace(day=1)
     else:
         selected_date = today.replace(day=1)
 
-    # 2. Dolgozók lekérése
-    employees = Employee.objects.filter(status='ACTIVE')
-    payroll_data = []
+    year = selected_date.year
+    month = selected_date.month
 
+    # 1. Aktív dolgozók
+    employees = Employee.objects.filter(status='ACTIVE').only('id', 'name', 'position', 'daily_cost')
+
+    # 2. Havi aggregációk egy körben
+    hours_qs = Attendance.objects.filter(date__year=year, date__month=month)
+    hours_map = {
+        row['employee']: row['total'] or Decimal('0')
+        for row in hours_qs.values('employee').annotate(total=Sum('hours_worked'))
+    }
+
+    from .models import PayrollItem as _PayrollItem
+    advances_qs = _PayrollItem.objects.filter(
+        date__year=year, date__month=month, type__in=['ADVANCE', 'LOAN']
+    )
+    advances_map = {
+        row['employee']: row['total'] or Decimal('0')
+        for row in advances_qs.values('employee').annotate(total=Sum('amount'))
+    }
+
+    # 3. Havi statisztikák összeállítása
+    hr_stats = []
     for emp in employees:
-        # a) Ledolgozott órák ebben a hónapban
-        attendance_qs = Attendance.objects.filter(
-            employee=emp,
-            date__year=selected_date.year,
-            date__month=selected_date.month
-        )
-        total_hours = attendance_qs.aggregate(Sum('hours_worked'))['hours_worked__sum'] or 0
+        monthly_hours = Decimal(hours_map.get(emp.id, 0))
+        daily_cost = emp.daily_cost or Decimal('0')
+        hourly_rate = (Decimal(daily_cost) / Decimal(8)) if daily_cost else Decimal('0')
+        estimated_wage = (monthly_hours * hourly_rate).quantize(Decimal('0.01'))
 
-        # b) Munkabér számítása (Napi bér / 8 * ledolgozott óra)
-        # Ha nincs napi bér beállítva, 0-val számolunk
-        daily_cost = emp.daily_cost or 0
-        hourly_rate = Decimal(daily_cost) / Decimal(8)
-        base_salary = Decimal(total_hours) * hourly_rate
+        advances = Decimal(advances_map.get(emp.id, 0))
 
-        # c) Pénzügyi tételek (Előleg, Prémium)
-        items = PayrollItem.objects.filter(
-            employee=emp,
-            date__year=selected_date.year,
-            date__month=selected_date.month
-        )
-
-        advances = items.filter(type='ADVANCE').aggregate(Sum('amount'))['amount__sum'] or 0
-        prems = items.filter(type='PREMIUM').aggregate(Sum('amount'))['amount__sum'] or 0
-        deductions = items.filter(type='DEDUCTION').aggregate(Sum('amount'))['amount__sum'] or 0
-
-        # d) Végösszeg (Alapbér + Prémium - Előleg - Levonás)
-        final_pay = base_salary + prems - advances - deductions
-
-        payroll_data.append({
+        hr_stats.append({
             'employee': emp,
-            'hours': total_hours,
-            'base_salary': base_salary,
+            'hours': monthly_hours,
+            'wage': estimated_wage,
             'advances': advances,
-            'premiums': prems,
-            'deductions': deductions,
-            'final_pay': final_pay
+            'payable': (estimated_wage - advances).quantize(Decimal('0.01'))
         })
 
     context = {
-        'payroll_data': payroll_data,
+        'title': 'HR és Munkaügy',
+        'hr_stats': hr_stats,
         'selected_date': selected_date,
-        'today': today
+        'today': today,
     }
     return render(request, 'projects/hr_dashboard.html', context)
 
@@ -1688,12 +1690,22 @@ def hr_calendar(request):
     # Szótárba rakjuk a gyors kereséshez: { nap_száma : PublicHolidayObjektum }
     holiday_map = {h.date.day: h for h in holidays}
 
-    employees = Employee.objects.filter(status='ACTIVE').order_by('name')
+    employees = Employee.objects.filter(status='ACTIVE').order_by('name').only('id', 'name', 'position')
     calendar_data = []
 
+    # Előre lehúzzuk az összes jelenlétet és csoportosítjuk
+    # select_related('project') a "teljesítés helye" kijelzéséhez
+    all_attendances = (
+        Attendance.objects
+        .filter(date__year=year, date__month=month, employee__status='ACTIVE')
+        .select_related('employee', 'project')
+    )
+    att_by_emp = {}
+    for a in all_attendances:
+        att_by_emp.setdefault(a.employee_id, {})[a.date.day] = a
+
     for emp in employees:
-        attendances = Attendance.objects.filter(employee=emp, date__year=year, date__month=month)
-        att_map = {a.date.day: a for a in attendances}
+        att_map = att_by_emp.get(emp.id, {})
 
         row_days = []
         for day in days_range:
@@ -1707,30 +1719,28 @@ def hr_calendar(request):
             holiday_name = ""
 
             if holiday_obj:
-                # Ha van bejegyzés a PublicHoliday táblában:
                 if holiday_obj.is_workday:
-                    # Áthelyezett munkanap (pl. Szombat, de dolgozni kell)
                     is_weekend = False
                     is_holiday = False
                 else:
-                    # Fizetett ünnep (pl. Márc. 15) - Pihenőnap
                     is_weekend = True
                     is_holiday = True
                     holiday_name = holiday_obj.name
             else:
-                # Normál naptári logika
                 is_weekend = weekday >= 5
 
             att = att_map.get(day)
 
             row_days.append({
                 'day': day,
-                'is_weekend': is_weekend,  # Ez most már "pihenőnap"-ot jelent (hétvége VAGY ünnep)
-                'is_holiday': is_holiday,  # Ez jelöli, ha piros betűs ünnep
+                'is_weekend': is_weekend,
+                'is_holiday': is_holiday,
                 'holiday_name': holiday_name,
                 'attendance': att,
                 'status': att.status if att else None,
-                'hours': att.hours_worked if att else None
+                'hours': att.hours_worked if att else None,
+                'project_name': (att.project.name if (att and att.project_id) else None),
+                'project_id': (att.project_id if (att and att.project_id) else None),
             })
 
         calendar_data.append({'employee': emp, 'days': row_days})
@@ -1754,6 +1764,380 @@ def hr_calendar(request):
         'selected_date': selected_date,
         'header_days': header_days,  # Javított fejléc adatok
         'calendar_data': calendar_data,
-        'today': today
+        'today': today,
+        'is_current_month': (today.year == year and today.month == month),
+        'today_day': today.day,
+        # Aktív projektek (teljesítés helye választék)
+        'active_projects': list(
+            Project.objects.exclude(status__in=['LEZART', 'ELUTASITVA', 'TORLES_KERELEM'])
+            .only('id', 'name').order_by('name')
+            .values('id', 'name')
+        )
     }
     return render(request, 'projects/hr_calendar.html', context)
+
+
+@login_required
+@require_POST
+def hr_calendar_update(request):
+    """Inline frissítés a jelenléti naptár dátum oszlopából.
+
+    JSON bemenet:
+      - employee_id: int
+      - date: 'YYYY-MM-DD'
+      - field: 'hours'
+      - value: szám (0..16, 0.5 lépés)
+      - reason: szöveg (opcionális)
+
+    Válasz: { ok: true, hours: '8.0' }
+    """
+    import json
+    from decimal import Decimal, InvalidOperation
+    from .models import Attendance, AttendanceAuditLog, Employee
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'Érvénytelen JSON'}, status=400)
+
+    employee_id = payload.get('employee_id')
+    date_str = payload.get('date')
+    field = payload.get('field')
+    value = payload.get('value')
+    reason = (payload.get('reason') or '').strip()
+
+    if not (employee_id and date_str and field in ('hours', 'project')):
+        return JsonResponse({'ok': False, 'error': 'Hiányzó adatok'}, status=400)
+
+    try:
+        d = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Érvénytelen dátum'}, status=400)
+
+    try:
+        emp = Employee.objects.get(id=employee_id)
+    except Employee.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Ismeretlen dolgozó'}, status=404)
+
+    if field == 'hours':
+        try:
+            dec = Decimal(str(value))
+        except (InvalidOperation, TypeError):
+            return JsonResponse({'ok': False, 'error': 'Érvénytelen óraszám'}, status=400)
+        # 0..16 órát engedünk, 0.5 lépéssel; egy tizedesre kerekítjük
+        if dec < Decimal('0') or dec > Decimal('16'):
+            return JsonResponse({'ok': False, 'error': 'Óraszám tartományon kívül (0-16)'}, status=400)
+        dec = dec.quantize(Decimal('0.1'))
+
+        att, created = Attendance.objects.get_or_create(
+            employee=emp, date=d,
+            defaults={'status': 'WORK', 'hours_worked': dec}
+        )
+
+        if created:
+            original = ''
+        else:
+            original = str(att.hours_worked)
+            att.hours_worked = dec
+            # ha korábban nem WORK volt, nem írjuk át automatikusan, csak órát
+            att.save()
+
+        if created:
+            att.save()
+
+        AttendanceAuditLog.objects.create(
+            attendance=att,
+            modified_by=request.user,
+            original_value=original,
+            new_value=str(dec),
+            reason=reason,
+        )
+
+        return JsonResponse({'ok': True, 'hours': str(att.hours_worked)})
+
+    if field == 'project':
+        # value lehet None/"" a törléshez, vagy numerikus projekt_id
+        from .models import Project
+        original = None
+
+        att, _ = Attendance.objects.get_or_create(
+            employee=emp, date=d, defaults={'status': 'WORK'}
+        )
+
+        original = att.project.name if att.project_id else ''
+
+        # Üres érték esetén töröljük a projektet
+        if value in (None, '', 0, '0'):
+            att.project = None
+            att.save()
+            new_val = ''
+            AttendanceAuditLog.objects.create(
+                attendance=att,
+                modified_by=request.user,
+                original_value=original,
+                new_value=new_val,
+                reason=reason,
+            )
+            return JsonResponse({'ok': True, 'project': {'id': None, 'name': ''}})
+
+        # Ellenőrzés: létező és nem törlésre jelölt projekt
+        try:
+            proj = Project.objects.get(id=int(value))
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'Ismeretlen projekt'}, status=404)
+
+        if getattr(proj, 'status', None) in ['TORLES_KERELEM']:
+            return JsonResponse({'ok': False, 'error': 'A projekt nem választható'}, status=400)
+
+        att.project = proj
+        att.save()
+
+        AttendanceAuditLog.objects.create(
+            attendance=att,
+            modified_by=request.user,
+            original_value=original,
+            new_value=proj.name,
+            reason=reason,
+        )
+
+        return JsonResponse({'ok': True, 'project': {'id': proj.id, 'name': proj.name}})
+
+    return JsonResponse({'ok': False, 'error': 'Ismeretlen mező'}, status=400)
+
+
+# (Megjegyzés: korábbi, duplikált hr_dashboard törölve; a fenti egységesített verzió marad.)
+
+
+@login_required
+def hr_payroll(request):
+    """Bérszámfejtés lista nézet szűrőkkel és gyors hozzáadással.
+
+    GET paraméterek:
+      - month=YYYY-MM (kötelező, alapértelmezés: aktuális hónap)
+      - employee: int (opcionális)
+      - type: str egyik a PayrollItem.TYPE_CHOICES-ból (opcionális)
+      - approved: '1' ha csak jóváhagyott tételek
+
+    POST: új PayrollItem gyors felvétele az űrlapból.
+    """
+    from .models import PayrollItem, Employee
+
+    today = timezone.now().date()
+    selected_month_str = request.GET.get('month') or request.POST.get('month')
+    if selected_month_str:
+        try:
+            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date().replace(day=1)
+        except ValueError:
+            selected_date = today.replace(day=1)
+    else:
+        selected_date = today.replace(day=1)
+
+    year = selected_date.year
+    month = selected_date.month
+
+    # Gyors hozzáadás kezelése
+    if request.method == 'POST':
+        emp_id = request.POST.get('employee')
+        p_type = request.POST.get('type')
+        amount = request.POST.get('amount')
+        note = request.POST.get('note', '').strip()
+        approved_flag = bool(request.POST.get('approved'))
+        item_date_str = request.POST.get('date') or selected_date.strftime('%Y-%m-01')
+        try:
+            item_date = datetime.strptime(item_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            item_date = selected_date
+
+        if emp_id and p_type and amount:
+            try:
+                emp = Employee.objects.get(id=emp_id)
+                PayrollItem.objects.create(
+                    employee=emp,
+                    date=item_date,
+                    type=p_type,
+                    amount=Decimal(amount),
+                    note=note,
+                    approved=approved_flag,
+                )
+                messages.success(request, 'Bér tétel rögzítve.')
+                # Redirect ugyanarra a listára (PRG minta)
+                return redirect(f"{reverse('hr-payroll')}?month={selected_date.strftime('%Y-%m')}")
+            except Employee.DoesNotExist:
+                messages.error(request, 'Ismeretlen dolgozó.')
+            except Exception:
+                messages.error(request, 'Hiba történt a mentés során. Ellenőrizd az adatokat.')
+
+    # Szűrők
+    employee_id = request.GET.get('employee')
+    type_filter = request.GET.get('type')
+    approved_only = request.GET.get('approved') == '1'
+
+    qs = PayrollItem.objects.filter(date__year=year, date__month=month).select_related('employee')
+    if employee_id:
+        qs = qs.filter(employee_id=employee_id)
+    if type_filter:
+        qs = qs.filter(type=type_filter)
+    if approved_only:
+        qs = qs.filter(approved=True)
+
+    # Összesítők egy aggregációval
+    agg = qs.aggregate(
+        adv=Sum('amount', filter=Q(type='ADVANCE')),
+        prem=Sum('amount', filter=Q(type='PREMIUM')),
+        ded=Sum('amount', filter=Q(type='DEDUCTION')),
+        loan=Sum('amount', filter=Q(type='LOAN')),
+    )
+    totals = {
+        'ADVANCE': agg['adv'] or Decimal('0'),
+        'PREMIUM': agg['prem'] or Decimal('0'),
+        'DEDUCTION': agg['ded'] or Decimal('0'),
+        'LOAN': agg['loan'] or Decimal('0'),
+    }
+    totals['NET'] = (totals['PREMIUM'] - totals['ADVANCE'] - totals['DEDUCTION'] - totals['LOAN'])
+
+    employees = Employee.objects.filter(status='ACTIVE').order_by('name')
+    # Típus választék a sablonnak
+    type_choices = getattr(PayrollItem._meta.get_field('type'), 'choices', [])
+
+    context = {
+        'selected_date': selected_date,
+        'today': today,
+        'items': qs.order_by('-date', 'employee__name'),
+        'employees': employees,
+        'totals': totals,
+        'current_employee_id': int(employee_id) if employee_id else None,
+        'current_type': type_filter or '',
+        'approved_only': approved_only,
+        'type_choices': type_choices,
+    }
+    return render(request, 'projects/hr_payroll.html', context)
+
+
+@login_required
+def hr_payroll_export_xlsx(request):
+    """Excel export a bérszámfejtés listáról (a szűrők megtartásával)."""
+    from .models import PayrollItem
+
+    today = timezone.now().date()
+    selected_month_str = request.GET.get('month')
+    if selected_month_str:
+        try:
+            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date().replace(day=1)
+        except ValueError:
+            selected_date = today.replace(day=1)
+    else:
+        selected_date = today.replace(day=1)
+
+    year = selected_date.year
+    month = selected_date.month
+
+    employee_id = request.GET.get('employee')
+    type_filter = request.GET.get('type')
+    approved_only = request.GET.get('approved') == '1'
+
+    qs = PayrollItem.objects.filter(date__year=year, date__month=month).select_related('employee')
+    if employee_id:
+        qs = qs.filter(employee_id=employee_id)
+    if type_filter:
+        qs = qs.filter(type=type_filter)
+    if approved_only:
+        qs = qs.filter(approved=True)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Payroll {selected_date.strftime('%Y-%m')}"
+    ws.append(["Dátum", "Dolgozó", "Típus", "Összeg (Ft)", "Megjegyzés", "Jóváhagyva"]) 
+
+    for item in qs.order_by('date', 'employee__name'):
+        ws.append([
+            item.date.strftime('%Y-%m-%d'),
+            item.employee.name if item.employee_id else '',
+            item.type,
+            float(item.amount),  # Excel numeric cell
+            (item.note or '')[:250],
+            'Igen' if item.approved else 'Nem'
+        ])
+
+    # Válasz visszaadása
+    from io import BytesIO
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"payroll_{selected_date.strftime('%Y_%m')}.xlsx"
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def hr_payroll_export_pdf(request):
+    """PDF export a bérszámfejtés listáról a szűrők megtartásával.
+    Ha nincs xhtml2pdf (pisa), egyszerű hibaüzenetet adunk vissza.
+    """
+    if pisa is None:
+        return HttpResponse("PDF export nem elérhető: xhtml2pdf nincs telepítve.", status=501)
+
+    from .models import PayrollItem
+
+    today = timezone.now().date()
+    selected_month_str = request.GET.get('month')
+    if selected_month_str:
+        try:
+            selected_date = datetime.strptime(selected_month_str, "%Y-%m").date().replace(day=1)
+        except ValueError:
+            selected_date = today.replace(day=1)
+    else:
+        selected_date = today.replace(day=1)
+
+    year = selected_date.year
+    month = selected_date.month
+
+    employee_id = request.GET.get('employee')
+    type_filter = request.GET.get('type')
+    approved_only = request.GET.get('approved') == '1'
+
+    qs = PayrollItem.objects.filter(date__year=year, date__month=month).select_related('employee')
+    if employee_id:
+        qs = qs.filter(employee_id=employee_id)
+    if type_filter:
+        qs = qs.filter(type=type_filter)
+    if approved_only:
+        qs = qs.filter(approved=True)
+
+    # Totálok a fejlécbe
+    agg = qs.aggregate(
+        adv=Sum('amount', filter=Q(type='ADVANCE')),
+        prem=Sum('amount', filter=Q(type='PREMIUM')),
+        ded=Sum('amount', filter=Q(type='DEDUCTION')),
+        loan=Sum('amount', filter=Q(type='LOAN')),
+    )
+    totals = {
+        'ADVANCE': agg['adv'] or Decimal('0'),
+        'PREMIUM': agg['prem'] or Decimal('0'),
+        'DEDUCTION': agg['ded'] or Decimal('0'),
+        'LOAN': agg['loan'] or Decimal('0'),
+    }
+    totals['NET'] = (totals['PREMIUM'] - totals['ADVANCE'] - totals['DEDUCTION'] - totals['LOAN'])
+
+    context = {
+        'selected_date': selected_date,
+        'items': qs.order_by('employee__name', 'date'),
+        'totals': totals,
+    }
+
+    template = get_template('projects/hr_payroll_pdf.html')
+    html = template.render(context)
+
+    from io import BytesIO
+    result = BytesIO()
+    pisa.CreatePDF(src=html, dest=result)
+    result.seek(0)
+
+    filename = f"payroll_{selected_date.strftime('%Y_%m')}.pdf"
+    response = HttpResponse(result.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

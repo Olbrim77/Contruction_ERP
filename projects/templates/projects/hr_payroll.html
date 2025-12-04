@@ -1,0 +1,137 @@
+{% extends 'projects/base.html' %}
+{% load humanize %}
+
+{% block title %}Bérszámfejtés{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fixed-layout-container { display:flex; flex-direction:column; height:85vh; background:#fff; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.15); overflow:hidden; border:1px solid #ddd; }
+  .layout-header { flex:0 0 auto; background:#fff; border-bottom:1px solid #ddd; z-index:20; }
+  .header-top { padding:16px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .page-title h1 { margin:0; color:#005a9c; font-size:20px; }
+  .tabs { display:flex; gap:5px; padding:0 20px 10px; background:#f8f9fa; border-top:1px solid #eee; }
+  .tab-btn { padding:10px 16px; cursor:pointer; border:none; background:transparent; color:#6c757d; font-weight:600; border-bottom:3px solid transparent; }
+  .tab-btn.active { color:#005a9c; border-bottom-color:#005a9c; background:#fff; }
+
+  .layout-content { flex:1 1 auto; overflow:auto; background:#f4f6f9; padding:20px; }
+  .card { background:#fff; border:1px solid #e1e4e8; border-radius:8px; padding:16px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:10px; border-bottom:1px solid #eee; }
+  thead th { background:#fafafa; position:sticky; top:0; z-index:5; }
+  .numeric { text-align:right; font-family:monospace; font-weight:bold; }
+  .filters-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .filters-row select, .filters-row input[type="month"], .filters-row input[type="text"], .filters-row input[type="number"], .filters-row input[type="date"] { padding:6px 8px; border:1px solid #ccc; border-radius:4px; }
+  .btn { padding:8px 12px; border-radius:4px; text-decoration:none; display:inline-block; cursor:pointer; }
+  .btn-primary { background:#005a9c; color:#fff; border:none; }
+  .btn-light { background:#fff; border:1px solid #ccc; color:#333; }
+  .totals { display:flex; gap:14px; flex-wrap:wrap; }
+  .pill { background:#f1f3f5; border:1px solid #e1e4e8; border-radius:16px; padding:6px 10px; font-size:12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fixed-layout-container">
+  <div class="layout-header">
+    <div class="header-top">
+      <div class="page-title">
+        <h1>Bérszámfejtés</h1>
+        <small>Hónap: {{ selected_date|date:"Y. F" }}</small>
+      </div>
+      <form method="get" class="filters-row">
+        <input type="month" name="month" value="{{ selected_date|date:'Y-m' }}">
+        <select name="employee">
+          <option value="">– Minden dolgozó –</option>
+          {% for e in employees %}
+            <option value="{{ e.id }}" {% if current_employee_id == e.id %}selected{% endif %}>{{ e.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="type">
+          <option value="">– Minden típus –</option>
+          {% for code,label in type_choices %}
+            <option value="{{ code }}" {% if current_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" name="approved" value="1" {% if approved_only %}checked{% endif %}> Csak jóváhagyott
+        </label>
+        <button type="submit" class="btn btn-primary">Szűrés</button>
+        <a class="btn btn-light" href="{% url 'hr-dashboard' %}?month={{ selected_date|date:'Y-m' }}">Vissza</a>
+        <a class="btn btn-light" href="{% url 'hr-payroll-export-xlsx' %}?month={{ selected_date|date:'Y-m' }}{% if current_employee_id %}&employee={{ current_employee_id }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if approved_only %}&approved=1{% endif %}">Excel export</a>
+        <a class="btn btn-light" href="{% url 'hr-payroll-export-pdf' %}?month={{ selected_date|date:'Y-m' }}{% if current_employee_id %}&employee={{ current_employee_id }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if approved_only %}&approved=1{% endif %}">PDF export</a>
+      </form>
+    </div>
+    <div class="tabs">
+      <a class="tab-btn" href="{% url 'hr-dashboard' %}?month={{ selected_date|date:'Y-m' }}">Áttekintés</a>
+      <a class="tab-btn" href="{% url 'hr-calendar' %}?month={{ selected_date|date:'Y-m' }}">Jelenlét</a>
+      <button class="tab-btn active">Bérszámfejtés</button>
+    </div>
+  </div>
+
+  <div class="layout-content">
+    <div class="card" style="border-left:4px solid #005a9c;">
+      <h4 style="margin-top:0;">Gyors tétel felvétele</h4>
+      <form method="post" class="filters-row">
+        {% csrf_token %}
+        <input type="hidden" name="month" value="{{ selected_date|date:'Y-m' }}">
+        <input type="date" name="date" value="{{ selected_date|date:'Y-m' }}-01">
+        <select name="employee" required>
+          <option value="">– Dolgozó –</option>
+          {% for e in employees %}
+            <option value="{{ e.id }}">{{ e.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="type" required>
+          {% for code,label in type_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <input type="number" step="0.01" name="amount" placeholder="Összeg (Ft)" required>
+        <input type="text" name="note" placeholder="Megjegyzés (opcionális)" style="min-width:240px;">
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" name="approved" value="1"> Jóváhagyva
+        </label>
+        <button type="submit" class="btn btn-primary">Hozzáadás</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h4 style="margin-top:0;">Tételek</h4>
+      <div class="totals" style="margin-bottom:10px;">
+        <span class="pill">Előleg: <strong class="numeric">{{ totals.ADVANCE|floatformat:0|intcomma }} Ft</strong></span>
+        <span class="pill">Prémium: <strong class="numeric">{{ totals.PREMIUM|floatformat:0|intcomma }} Ft</strong></span>
+        <span class="pill">Levonás: <strong class="numeric">{{ totals.DEDUCTION|floatformat:0|intcomma }} Ft</strong></span>
+        <span class="pill">Kölcsön: <strong class="numeric">{{ totals.LOAN|floatformat:0|intcomma }} Ft</strong></span>
+        <span class="pill" style="background:#e3fcef; border-color:#c6f6d5;">Nettó hatás: <strong class="numeric">{{ totals.NET|floatformat:0|intcomma }} Ft</strong></span>
+      </div>
+      <div style="overflow:auto; max-height:50vh;">
+        <table>
+          <thead>
+            <tr>
+              <th>Dátum</th>
+              <th>Dolgozó</th>
+              <th>Típus</th>
+              <th class="numeric">Összeg</th>
+              <th>Megjegyzés</th>
+              <th>Jóváhagyva</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td>{{ it.date|date:'Y.m.d.' }}</td>
+              <td>{{ it.employee.name }}</td>
+              <td>{{ it.get_type_display }}</td>
+              <td class="numeric">{{ it.amount|floatformat:0|intcomma }} Ft</td>
+              <td>{{ it.note }}</td>
+              <td>{% if it.approved %}✔{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" style="text-align:center; padding:20px;">Nincs tétel ebben a hónapban.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

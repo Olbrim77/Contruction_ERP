@@ -4,7 +4,7 @@ from . import views
 from . import views_mobile  # <-- ÚJ IMPORT!
 
 urlpatterns = [
-    # --- ASZTALI NÉZETEK (VÁLTOZATLAN) ---
+    # --- ASZTALI NÉZETEK ---
     path('', views.project_list, name='project-list'),
     path('project/new/', views.project_create, name='project-create'),
     path('project/<int:pk>/edit/', views.project_update, name='project-update'),
@@ -16,10 +16,8 @@ urlpatterns = [
     path('tetelsor/<int:pk>/delete/', views.tetelsor_delete, name='tetelsor-delete'),
     path('project/<int:project_id>/import/', views.import_tasks, name='import-tasks'),
 
-    path('project/<int:project_id>/add-master/', views.tetelsor_create_from_master_step1,
-         name='tetelsor-create-master-step1'),
-    path('project/<int:project_id>/add-master/step2/<int:master_id>/', views.tetelsor_create_from_master_step2,
-         name='tetelsor-create-master-step2'),
+    path('project/<int:project_id>/add-master/', views.tetelsor_create_from_master_step1, name='tetelsor-create-master-step1'),
+    path('project/<int:project_id>/add-master/step2/<int:master_id>/', views.tetelsor_create_from_master_step2, name='tetelsor-create-master-step2'),
 
     path('project/<int:project_id>/expense/new/', views.expense_create, name='expense-create'),
     path('expense/<int:pk>/edit/', views.expense_update, name='expense-update'),
@@ -32,6 +30,7 @@ urlpatterns = [
 
     path('project/<int:project_id>/gantt/', views.gantt_view, name='gantt-view'),
     path('project/<int:project_id>/gantt/data/', views.gantt_data, name='gantt-data'),
+    path('project/<int:project_id>/gantt/update/', views.gantt_update, name='gantt-update'),
 
     path('project/<int:pk>/quote-print/', views.project_quote_html, name='project-quote-html'),
     path('project/<int:pk>/pdf-quote/', views.project_quote_pdf, name='project-quote-pdf'),
@@ -50,11 +49,8 @@ urlpatterns = [
 
     path('daily-log/<int:pk>/', views.daily_log_detail, name='daily-log-detail'),
 
-    path('daily-log/image/<int:pk>/delete/', views.daily_log_image_delete, name='daily-log-image-delete'),
-
     path('project/<int:project_id>/order/new/', views.material_order_create, name='material-order-create'),
-    path('project/<int:project_id>/order/from-budget/', views.material_order_create_from_budget,
-         name='material-order-from-budget'),
+    path('project/<int:project_id>/order/from-budget/', views.material_order_create_from_budget, name='material-order-from-budget'),
     path('order/<int:pk>/edit/', views.material_order_update, name='material-order-update'),
     path('order/<int:pk>/delete/', views.material_order_delete, name='material-order-delete'),
     path('order/<int:pk>/print/', views.material_order_print, name='material-order-print'),
@@ -65,23 +61,24 @@ urlpatterns = [
     path('mobile/project/<int:pk>/', views_mobile.mobile_project_detail, name='mobile-project-detail'),
     path('mobile/project/<int:project_id>/log/', views_mobile.mobile_daily_log, name='mobile-daily-log'),
     path('mobile/leave/', views_mobile.mobile_leave_list, name='mobile-leave-list'),
+    path('mobile/project/<int:project_id>/attendance/', views_mobile.mobile_attendance, name='mobile-attendance'),
+    path('mobile/select-project/<str:action_type>/', views_mobile.mobile_project_selector, name='mobile-project-select'),
+
     path('task/<int:pk>/complete/', views.task_complete, name='task-complete'),
-    path('task/<int:pk>/complete/', views.task_complete, name='task-complete'),
-    path('project/<int:project_id>/gantt/', views.gantt_view, name='gantt-view'),
-    path('project/<int:project_id>/gantt/data/', views.gantt_data, name='gantt-data'),
-    path('project/<int:project_id>/gantt/update/', views.gantt_update, name='gantt-update'), # <-- ÚJ
-    path('tetelsor/<int:pk>/sync-to-master/', views.sync_tetelsor_to_master, name='sync-tetelsor-to-master'),
-    # === ÚJ MODULOK (Helyőrzők) ===
+
+    # === ÚJ MODULOK / HELYŐRZŐK ===
     path('resources/', views.resource_planning, name='resource-planning'),
-    path('hr/', views.hr_dashboard, name='hr-dashboard'),
 
-# ... HR ...
+    # === HR ===
     path('hr/', views.hr_dashboard, name='hr-dashboard'),
+    path('hr/calendar/', views.hr_calendar, name='hr-calendar'),
+    path('hr/calendar/update/', views.hr_calendar_update, name='hr-calendar-update'),
+    path('hr/<int:employee_id>/<int:year>/<int:month>/', views.employee_monthly_detail, name='employee-monthly-detail'),
+    path('hr/payroll/', views.hr_payroll, name='hr-payroll'),
+    path('hr/payroll/export/xlsx/', views.hr_payroll_export_xlsx, name='hr-payroll-export-xlsx'),
+    path('hr/payroll/export/pdf/', views.hr_payroll_export_pdf, name='hr-payroll-export-pdf'),
 
-path('hr/calendar/', views.hr_calendar, name='hr-calendar'), # <--- EZ AZ ÚJ
-    path('hr/<int:employee_id>/<int:year>/<int:month>/', views.employee_monthly_detail, name='employee-monthly-detail'),
-    # ÚJ SOR:
-    path('hr/<int:employee_id>/<int:year>/<int:month>/', views.employee_monthly_detail, name='employee-monthly-detail'),
+    # === EGYÉB ===
     path('inventory/', views.global_inventory, name='global-inventory'),
     path('finance/', views.finance_dashboard, name='finance-dashboard'),
     path('assets/', views.asset_list, name='asset-list'),
@@ -97,12 +94,4 @@ path('hr/calendar/', views.hr_calendar, name='hr-calendar'), # <--- EZ AZ ÚJ
     path('api/uniclass-tree/', views.uniclass_tree_data, name='uniclass-tree-data'),
 
     path('project/<int:project_id>/chapter/new/', views.project_chapter_create, name='project-chapter-create'),
-
-path('project/<int:project_id>/chapter/new/', views.project_chapter_create, name='project-chapter-create'),
-
-path('mobile/project/<int:project_id>/attendance/', views_mobile.mobile_attendance, name='mobile-attendance'),
-
-path('mobile/select-project/<str:action_type>/', views_mobile.mobile_project_selector, name='mobile-project-select'),
-
-path('mobile/select-project/<str:action_type>/', views_mobile.mobile_project_selector, name='mobile-project-select'),
 ]

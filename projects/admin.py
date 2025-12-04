@@ -98,3 +98,5 @@ class PublicHolidayAdmin(admin.ModelAdmin):
 class AttendanceAuditLogAdmin(admin.ModelAdmin):
     list_display = ('attendance', 'modified_by', 'modified_at', 'reason')
     readonly_fields = ('attendance', 'modified_by', 'modified_at', 'original_value', 'new_value')
+
+## Removed duplicate admin registrations for Employee, Attendance, and PayrollItem to avoid AlreadyRegistered errors.
