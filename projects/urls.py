@@ -71,6 +71,7 @@ urlpatterns = [
 
     # === HR ===
     path('hr/', views.hr_dashboard, name='hr-dashboard'),
+    path('hr/employee/new/', views.employee_create, name='employee-create'),
     path('hr/calendar/', views.hr_calendar, name='hr-calendar'),
     path('hr/calendar/update/', views.hr_calendar_update, name='hr-calendar-update'),
     path('hr/<int:employee_id>/<int:year>/<int:month>/', views.employee_monthly_detail, name='employee-monthly-detail'),

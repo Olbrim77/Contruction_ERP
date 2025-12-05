@@ -67,7 +67,7 @@ admin.site.register(ProjectInventory)
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'position', 'phone', 'daily_cost', 'status')
+    list_display = ('name', 'position', 'phone', 'hourly_wage', 'status')
     list_filter = ('status', 'position')
     search_fields = ('name',)
 

@@ -21,6 +21,7 @@ class Migration(migrations.Migration):
             name='projectinventory',
             unique_together=set(),
         ),
+        # Attendance table is already created in 0001_initial; keep only field changes below.
         migrations.AddField(
             model_name='attendance',
             name='end_time',

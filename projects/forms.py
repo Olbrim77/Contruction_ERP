@@ -7,7 +7,8 @@ from .models import (
     Project, Task, Tetelsor, Munkanem, Alvallalkozo, Expense, DailyLog,
     Supplier, Material, MasterItem, ItemComponent, ProjectDocument,
     MaterialOrder, OrderItem, ProjectInventory, DailyMaterialUsage,
-    UniclassNode, LaborComponent, MachineComponent, Operation, Machine, DailyLogImage,ProjectChapter, LeaveRequest
+    UniclassNode, LaborComponent, MachineComponent, Operation, Machine, DailyLogImage,ProjectChapter, LeaveRequest,
+    Employee
 )
 
 # --- SEGÉD: Dátum és Uniclass ---
@@ -181,4 +182,31 @@ class LeaveRequestForm(forms.ModelForm):
             'reason': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Megjegyzés (opcionális)...'}),
             # Fájl feltöltő (képet és pdf-et fogad el)
             'proof_file': forms.FileInput(attrs={'accept': 'image/*,application/pdf', 'class': 'file-input'})
+        }
+
+
+# --- HR: Dolgozó űrlap ---
+class EmployeeForm(forms.ModelForm):
+    class Meta:
+        model = Employee
+        fields = [
+            'name', 'position', 'phone', 'hourly_wage', 'tax_id', 'address',
+            'registration_form', 'contract_file', 'status', 'joined_date', 'user'
+        ]
+        widgets = {
+            'joined_date': DateInput(),
+            'hourly_wage': forms.NumberInput(attrs={'step': '1'}),
+        }
+        labels = {
+            'name': 'Név',
+            'position': 'Pozíció',
+            'phone': 'Telefon',
+            'hourly_wage': 'Órabér (Ft)',
+            'tax_id': 'Adóazonosító',
+            'address': 'Lakcím',
+            'registration_form': 'Bejelentő lap',
+            'contract_file': 'Munkaszerződés',
+            'status': 'Státusz',
+            'joined_date': 'Belépés dátuma',
+            'user': 'Felhasználói Fiók'
         }

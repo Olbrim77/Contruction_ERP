@@ -1,0 +1,29 @@
+{% extends 'projects/base.html' %}
+
+{% block title %}Új Dolgozó Felvétele{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:900px; margin:20px auto;">
+  <h2 style="margin-top:0; color:#005a9c;">Új Dolgozó Felvétele</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="{{ message.tags|default:'' }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <table class="table">
+      {{ form.as_table }}
+    </table>
+
+    <div style="display:flex; gap:10px;">
+      <button type="submit" class="btn btn-primary">Mentés</button>
+      <a href="{% url 'hr-dashboard' %}" class="btn btn-light">Mégse</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -239,15 +239,20 @@ class Tetelsor(models.Model):
     def __str__(self):
         return f"{self.master_item.tetelszam}"
 
+    class Meta:
+        unique_together = ('project', 'master_item')
+
 
 # --- 6. PÉNZÜGY ÉS NAPLÓ ---
 
-class Task(models.Model): project = models.ForeignKey(Project, on_delete=models.CASCADE); name = models.CharField(
-    max_length=200); status = models.CharField(max_length=20, default='FUGGO'); due_date = models.DateField(null=True,
-                                                                                                            blank=True)
+class Task(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    status = models.CharField(max_length=20, default='FUGGO')
+    due_date = models.DateField(null=True, blank=True)
 
-
-class Meta: ordering = ['due_date']
+    class Meta:
+        ordering = ['due_date']
 
 
 class Expense(models.Model):
@@ -286,44 +291,50 @@ class ProjectDocument(models.Model): project = models.ForeignKey(Project, relate
     auto_now_add=True); description = models.CharField(max_length=255, blank=True)
 
 
-class MaterialOrder(models.Model): project = models.ForeignKey(Project, related_name='material_orders',
-                                                               on_delete=models.CASCADE); supplier = models.ForeignKey(
-    Supplier, on_delete=models.SET_NULL, null=True, blank=True); date = models.DateField(
-    default=timezone.now); status = models.CharField(max_length=20, default='TERVEZET'); notes = models.TextField(
-    blank=True)
+class MaterialOrder(models.Model):
+    project = models.ForeignKey(Project, related_name='material_orders', on_delete=models.CASCADE)
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
+    date = models.DateField(default=timezone.now)
+    status = models.CharField(max_length=20, default='TERVEZET')
+    notes = models.TextField(blank=True)
 
 
-class OrderItem(models.Model): order = models.ForeignKey(MaterialOrder, related_name='items',
-                                                         on_delete=models.CASCADE); name = models.CharField(
-    max_length=200); quantity = models.DecimalField(max_digits=10, decimal_places=2); unit = models.CharField(
-    max_length=20); price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+class OrderItem(models.Model):
+    order = models.ForeignKey(MaterialOrder, related_name='items', on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=20)
+    price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    @property
+    def total_price(self):
+        return self.quantity * self.price
 
 
-@property
-def total_price(self): return self.quantity * self.price
+class ProjectInventory(models.Model):
+    project = models.ForeignKey(Project, related_name='inventory', on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unit = models.CharField(max_length=20)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('project', 'name')
 
 
-class ProjectInventory(models.Model): project = models.ForeignKey(Project, related_name='inventory',
-                                                                  on_delete=models.CASCADE); name = models.CharField(
-    max_length=200); quantity = models.DecimalField(max_digits=10, decimal_places=2,
-                                                    default=0); unit = models.CharField(
-    max_length=20); last_updated = models.DateTimeField(auto_now=True)
+class DailyMaterialUsage(models.Model):
+    log = models.ForeignKey(DailyLog, related_name='material_usages', on_delete=models.CASCADE)
+    inventory_item = models.ForeignKey(ProjectInventory, on_delete=models.CASCADE)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
 
 
-class Meta: unique_together = ('project', 'name')
+class GanttLink(models.Model):
+    source = models.ForeignKey(Tetelsor, related_name='source_links', on_delete=models.CASCADE)
+    target = models.ForeignKey(Tetelsor, related_name='target_links', on_delete=models.CASCADE)
+    type = models.CharField(max_length=2, default='0')
 
-
-class DailyMaterialUsage(models.Model): log = models.ForeignKey(DailyLog, related_name='material_usages',
-                                                                on_delete=models.CASCADE); inventory_item = models.ForeignKey(
-    ProjectInventory, on_delete=models.CASCADE); quantity = models.DecimalField(max_digits=10, decimal_places=2)
-
-
-class GanttLink(models.Model): source = models.ForeignKey(Tetelsor, related_name='source_links',
-                                                          on_delete=models.CASCADE); target = models.ForeignKey(
-    Tetelsor, related_name='target_links', on_delete=models.CASCADE); type = models.CharField(max_length=2, default='0')
-
-
-def __str__(self): return f"{self.source} -> {self.target}"
+    def __str__(self):
+        return f"{self.source} -> {self.target}"
 
 
 # --- 7. HR ÉS MUNKAERŐ MODUL ---
@@ -334,7 +345,10 @@ class Employee(models.Model):
     name = models.CharField(max_length=100, verbose_name="Név")
     position = models.CharField(max_length=100, verbose_name="Pozíció")
     phone = models.CharField(max_length=50, blank=True, verbose_name="Telefon")
+    # Meglévő napi költség a visszamenőleges kompatibilitásért
     daily_cost = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Napi Bérköltség (Ft)")
+    # ÚJ: Órabér alapú elszámolás
+    hourly_wage = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Órabér (Ft)")
     tax_id = models.CharField(max_length=50, blank=True, verbose_name="Adóazonosító")
     address = models.CharField(max_length=255, blank=True, verbose_name="Lakcím")
     registration_form = models.FileField(upload_to='hr_docs/', blank=True, null=True, verbose_name="Bejelentő lap")
@@ -343,6 +357,21 @@ class Employee(models.Model):
     joined_date = models.DateField(null=True, blank=True, verbose_name="Belépés dátuma")
 
     def __str__(self): return self.name
+
+    # Segédfüggvény: effektív órabér, visszaesik a napi_költség/8-ra ha nincs megadva órabér
+    def get_hourly_wage(self) -> Decimal:
+        try:
+            hw = Decimal(self.hourly_wage or 0)
+        except Exception:
+            hw = Decimal(0)
+        if hw and hw > 0:
+            return hw
+        # Fallback a régi napi elszámolásra
+        try:
+            dc = Decimal(self.daily_cost or 0)
+        except Exception:
+            dc = Decimal(0)
+        return (dc / Decimal(8)) if dc else Decimal(0)
 
     class Meta: verbose_name = "Dolgozó"; verbose_name_plural = "Dolgozók"
 

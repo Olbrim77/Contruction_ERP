@@ -43,7 +43,7 @@ from .forms import (
     ProjectDocumentForm, MaterialOrderForm, OrderItemFormSet, DailyMaterialUsageFormSet,
     TaskForm, LaborComponentForm, MachineComponentForm, MobilePhotoForm,
     MaterialInlineFormSet, LaborInlineFormSet, MachineInlineFormSet,
-    DailyLogImageFormSet, ProjectDocumentFormSet, ProjectChapterForm
+    DailyLogImageFormSet, ProjectDocumentFormSet, ProjectChapterForm, EmployeeForm
 )
 
 try:
@@ -58,16 +58,13 @@ from .forms import (
     ProjectDocumentForm, MaterialOrderForm, OrderItemFormSet, DailyMaterialUsageFormSet,
     TaskForm, LaborComponentForm, MachineComponentForm, MobilePhotoForm,
     MaterialInlineFormSet, LaborInlineFormSet, MachineInlineFormSet,
-    DailyLogImageFormSet, ProjectDocumentFormSet,ProjectChapterForm
+    DailyLogImageFormSet, ProjectDocumentFormSet,ProjectChapterForm, EmployeeForm
 )
 
 try:
     from xhtml2pdf import pisa
 except ImportError:
     pisa = None
-
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
 
 # --- SEGÉDFÜGGVÉNYEK ---------------------------------------------------------
@@ -1538,7 +1535,7 @@ def hr_dashboard(request):
     month = selected_date.month
 
     # 1. Aktív dolgozók
-    employees = Employee.objects.filter(status='ACTIVE').only('id', 'name', 'position', 'daily_cost')
+    employees = Employee.objects.filter(status='ACTIVE').only('id', 'name', 'position', 'hourly_wage', 'daily_cost')
 
     # 2. Havi aggregációk egy körben
     hours_qs = Attendance.objects.filter(date__year=year, date__month=month)
@@ -1560,8 +1557,7 @@ def hr_dashboard(request):
     hr_stats = []
     for emp in employees:
         monthly_hours = Decimal(hours_map.get(emp.id, 0))
-        daily_cost = emp.daily_cost or Decimal('0')
-        hourly_rate = (Decimal(daily_cost) / Decimal(8)) if daily_cost else Decimal('0')
+        hourly_rate = emp.get_hourly_wage()
         estimated_wage = (monthly_hours * hourly_rate).quantize(Decimal('0.01'))
 
         advances = Decimal(advances_map.get(emp.id, 0))
@@ -1574,13 +1570,45 @@ def hr_dashboard(request):
             'payable': (estimated_wage - advances).quantize(Decimal('0.01'))
         })
 
+    # 4. Mai jelenlét (dolgozók száma, akik WORK státusszal rendelkeznek ma)
+    today_present_count = Attendance.objects.filter(date=today, status='WORK').values('employee').distinct().count()
+
+    # 5. Havi kifizetendő összesen
+    monthly_payable_total = sum((row['payable'] for row in hr_stats), Decimal('0')) if hr_stats else Decimal('0')
+
+    # 6. Lejárt iratok száma (jelenleg nincs lejárati mező a modellekben, így 0)
+    expired_docs_count = 0
+
     context = {
         'title': 'HR és Munkaügy',
         'hr_stats': hr_stats,
         'selected_date': selected_date,
         'today': today,
+        'today_present_count': today_present_count,
+        'monthly_payable_total': monthly_payable_total,
+        'expired_docs_count': expired_docs_count,
     }
     return render(request, 'projects/hr_dashboard.html', context)
+
+
+@login_required
+def employee_create(request):
+    """Új dolgozó felvétele (HR)"""
+    if request.method == 'POST':
+        form = EmployeeForm(request.POST, request.FILES)
+        if form.is_valid():
+            employee = form.save()
+            messages.success(request, f"Dolgozó sikeresen rögzítve: {employee.name}")
+            return redirect('hr-dashboard')
+        else:
+            messages.error(request, 'Kérjük, javítsd az űrlap hibáit.')
+    else:
+        form = EmployeeForm()
+
+    return render(request, 'projects/employee_form.html', {
+        'form': form,
+        'title': 'Új Dolgozó Felvétele'
+    })
 
 @login_required
 def global_inventory(request): all_items = ProjectInventory.objects.all().order_by('name'); return render(request,
@@ -1634,9 +1662,8 @@ def employee_monthly_detail(request, employee_id, year, month):
         date__range=(start_date, end_date)
     ).order_by('date')
 
-    # Számítások
-    daily_cost = employee.daily_cost or 0
-    hourly_rate = Decimal(daily_cost) / Decimal(8)
+    # Számítások — alapbér órabér szerint
+    hourly_rate = employee.get_hourly_wage()
     base_salary = Decimal(total_hours) * hourly_rate
 
     advances = payroll_items.filter(type='ADVANCE').aggregate(Sum('amount'))['amount__sum'] or 0
